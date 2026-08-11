@@ -55,7 +55,9 @@ def explore_dataset(
     df["word_count"] = df["Text"].astype(str).str.split().str.len()
 
     # 2. Image Resolution Analysis
-    img_widths, img_heights, aspect_ratios = [], [], []
+    img_widths: list[int | None] = []
+    img_heights: list[int | None] = []
+    aspect_ratios: list[float | None] = []
     for _, row in df.iterrows():
         img_path = img_dir / row["Id"]
         if img_path.exists():
