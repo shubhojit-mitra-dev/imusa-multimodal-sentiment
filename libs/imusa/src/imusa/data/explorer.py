@@ -141,7 +141,7 @@ def _plot_class_distribution(df: pd.DataFrame, output_file: Path) -> None:
 def _plot_text_length(df: pd.DataFrame, output_file: Path) -> None:
     """Plot word count distributions per category."""
     fig, ax = plt.subplots(figsize=(10, 5))
-    sns.boxplot(data=df, x="Category", y="word_count", palette="Set2", ax=ax, width=0.5)
+    sns.boxplot(data=df, x="Category", y="word_count", hue="Category", legend=False, palette="Set2", ax=ax, width=0.5)
 
     ax.set_title("Punjabi Text Word Count per Sentiment Category", fontsize=14, fontweight="bold", pad=15)
     ax.set_xlabel("Category", fontsize=12, fontweight="bold")
