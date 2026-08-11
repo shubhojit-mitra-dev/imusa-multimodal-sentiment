@@ -8,16 +8,18 @@ This document synthesizes the experimental methodologies, architectural decision
 ## 1. Task Definition & Problem Formulation
 
 ### 1.1 Modalities & Objective
-- **Input Modality 1 (Text)**: Extracted Gurmukhi script text string \( T \).
-- **Input Modality 2 (Vision)**: RGB meme image \( V \in \mathbb{R}^{H \times W \times 3} \).
-- **Output Target**: Discrete class label \( y \in \{\text{Sarcasm}, \text{Motivational}, \text{Neutral}, \text{Offensive}\} \).
+- **Input Modality 1 (Text)**: Extracted Gurmukhi script text string $T$.
+- **Input Modality 2 (Vision)**: RGB meme image $V \in \mathbb{R}^{H \times W \times 3}$.
+- **Output Target**: Discrete class label $y \in \{\text{Sarcasm}, \text{Motivational}, \text{Neutral}, \text{Offensive}\}$.
 
 ### 1.2 Mathematical Formulation
-Let \( \mathcal{D} = \{(V_i, T_i, y_i)\}_{i=1}^N \) denote the dataset. The multimodal model estimates the class probability distribution:
-\[
+Let $\mathcal{D} = \{(V_i, T_i, y_i)\}_{i=1}^N$ denote the dataset. The multimodal model estimates the class probability distribution:
+
+$$
 P(y \mid V, T; \Theta) = \text{softmax}(W \cdot f_{\text{fusion}}(e_v(V), e_t(T)) + b)
-\]
-where \( e_v(V) \) is the visual representation, \( e_t(T) \) is the textual embedding, and \( f_{\text{fusion}} \) integrates both representations.
+$$
+
+where $e_v(V)$ is the visual representation, $e_t(T)$ is the textual embedding, and $f_{\text{fusion}}$ integrates both representations.
 
 ---
 
@@ -51,13 +53,13 @@ Category Breakdown:
 
 #### Analytical Impact of the 25:1 Class Imbalance
 The imbalance ratio between the majority class (`Sarcasm`) and minority class (`Offensive`) is **24.98 : 1**.
-- **Theoretical Failure Mode**: Under standard cross-entropy loss \( \mathcal{L} = -\sum y_i \log \hat{y}_i \), gradients dominated by `Sarcasm` will collapse minority class predictions to zero. A naive model predicting `Sarcasm` for all samples achieves **44.07% accuracy** while yielding **0.0 recall on `Offensive`**.
+- **Theoretical Failure Mode**: Under standard cross-entropy loss $\mathcal{L} = -\sum y_i \log \hat{y}_i$, gradients dominated by `Sarcasm` will collapse minority class predictions to zero. A naive model predicting `Sarcasm` for all samples achieves **44.07% accuracy** while yielding **0.0 recall on `Offensive`**.
 - **Mitigation Strategy (Phase 2)**:
   - Inverse Class-Frequency Weighting:
-    \[
+    $$
     w_c = \frac{N}{K \cdot N_c}
-    \]
-  - Focal Loss \( \mathcal{L}_{\text{focal}} = -\alpha_t (1 - p_t)^\gamma \log(p_t) \) with dynamic focal scaling parameter \( \gamma = 2.0 \).
+    $$
+  - Focal Loss $\mathcal{L}_{\text{focal}} = -\alpha_t (1 - p_t)^\gamma \log(p_t)$ with dynamic focal scaling parameter $\gamma = 2.0$.
   - Oversampling / Cross-modal Data Augmentation for `Offensive` samples.
 
 ### 2.3 Text Length Dynamics
@@ -73,7 +75,7 @@ The imbalance ratio between the majority class (`Sarcasm`) and minority class (`
 ![Meme Image Dimensions Scatter Plot](assets/image_resolution_distribution.png)
 
 - **Resolution Range**: Width: 200px to 750px; Height: 200px to 1,500px.
-- **Preprocessing Requirement**: Standardized bilinear resizing to \( 224 \times 224 \) pixels with ImageNet normalization parameters (\( \mu = [0.485, 0.456, 0.406] \), \( \sigma = [0.229, 0.224, 0.225] \)).
+- **Preprocessing Requirement**: Standardized bilinear resizing to $224 \times 224$ pixels with ImageNet normalization parameters ($\mu = [0.485, 0.456, 0.406]$, $\sigma = [0.229, 0.224, 0.225]$).
 
 ### 2.5 Qualitative Multimodal Samples
 
@@ -85,32 +87,38 @@ The imbalance ratio between the majority class (`Sarcasm`) and minority class (`
 
 ### 3.1 Dual-Encoder Feature Extraction
 The multimodal architecture leverages pre-trained deep transformers for both modalities:
-1. **Vision Encoder \( e_v \)**: Given meme image \( V \in \mathbb{R}^{3 \times 224 \times 224} \), `google/vit-base-patch16-224` extracts 196 patch tokens of dimension 768. The pooled `[CLS]` visual embedding is \( \mathbf{h}_v \in \mathbb{R}^{768} \).
-2. **Text Encoder \( e_t \)**: Given Gurmukhi token sequence \( T \), `xlm-roberta-base` processes sequence embeddings to yield textual pooled representation \( \mathbf{h}_t \in \mathbb{R}^{768} \).
+1. **Vision Encoder $e_v$**: Given meme image $V \in \mathbb{R}^{3 \times 224 \times 224}$, `google/vit-base-patch16-224` extracts 196 patch tokens of dimension 768. The pooled `[CLS]` visual embedding is $\mathbf{h}_v \in \mathbb{R}^{768}$.
+2. **Text Encoder $e_t$**: Given Gurmukhi token sequence $T$, `xlm-roberta-base` processes sequence embeddings to yield textual pooled representation $\mathbf{h}_t \in \mathbb{R}^{768}$.
 
 ### 3.2 Gated Multimodal Fusion Module
 To dynamically balance textual and visual evidence, representations are fused via a learned gating mechanism:
-\[
-\mathbf{x}_{\text{concat}} = [\mathbf{h}_v \,;\, \mathbf{h}_t] \in \mathbb{R}^{1536}
-\]
-\[
+
+$$
+\mathbf{x}_{\text{concat}} = [\mathbf{h}_v \;;\; \mathbf{h}_t] \in \mathbb{R}^{1536}
+$$
+
+$$
 \mathbf{g} = \sigma(W_g \mathbf{x}_{\text{concat}} + \mathbf{b}_g) \in (0, 1)^{1536}
-\]
-\[
+$$
+
+$$
 \mathbf{h}_{\text{fused}} = \text{GELU}\left(\text{LayerNorm}(W_f (\mathbf{g} \odot \mathbf{x}_{\text{concat}}) + \mathbf{b}_f)\right) \in \mathbb{R}^{1536}
-\]
+$$
 
 ### 3.3 Classification Head & Objective Function
 Logits are computed via a multi-layer perceptron:
-\[
-\mathbf{z} = W_2 \left(\text{Dropout}\left(\text{GELU}\left(\text{LayerNorm}(W_1 \mathbf{h}_{\text{fused}} + \mathbf{b}_1)\right)\right)\right) + \mathbf{b}_2 \in \mathbb{R}^4
-\]
 
-To resolve the 25:1 imbalance, optimization uses Focal Loss with balanced class weights \( \alpha_c = \frac{N}{K \cdot N_c} \):
-\[
+$$
+\mathbf{z} = W_2 \left(\text{Dropout}\left(\text{GELU}\left(\text{LayerNorm}(W_1 \mathbf{h}_{\text{fused}} + \mathbf{b}_1)\right)\right)\right) + \mathbf{b}_2 \in \mathbb{R}^4
+$$
+
+To resolve the 25:1 imbalance, optimization uses Focal Loss with balanced class weights $\alpha_c = \frac{N}{K \cdot N_c}$:
+
+$$
 \mathcal{L}_{\text{Focal}} = -\sum_{c=1}^K \alpha_c (1 - p_c)^\gamma y_c \log(p_c)
-\]
-where \( p_c = \text{softmax}(\mathbf{z})_c \) and \( \gamma = 2.0 \).
+$$
+
+where $p_c = \text{softmax}(\mathbf{z})_c$ and $\gamma = 2.0$.
 
 ---
 
