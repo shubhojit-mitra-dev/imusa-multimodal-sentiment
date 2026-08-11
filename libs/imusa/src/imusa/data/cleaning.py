@@ -101,7 +101,26 @@ def clean_dataset(
     df_filtered_cat = df_valid_cat[~invalid_cat_mask].copy()
 
     # 3. Verify Image File Existence
+    # Some CSV entries may be missing the file extension (e.g., "image_punjabi_1171"
+    # instead of "image_punjabi_1171.jpg"). We check for exact match first, then try
+    # common image extensions as fallback. If a match is found, we normalize the Id
+    # to include the extension so downstream code can always use Id directly as a filename.
     existing_images = set(p.name for p in img_dir.glob("*") if p.is_file())
+    image_extensions = [".jpg", ".jpeg", ".png"]
+
+    def _resolve_image_id(img_id: str) -> str | None:
+        """Resolve an image ID to its actual filename on disk, or None if missing."""
+        if img_id in existing_images:
+            return img_id
+        for ext in image_extensions:
+            candidate = img_id + ext
+            if candidate in existing_images:
+                return candidate
+        return None
+
+    df_filtered_cat["Id"] = df_filtered_cat["Id"].apply(
+        lambda img_id: _resolve_image_id(img_id) or img_id
+    )
     image_exists_mask = df_filtered_cat["Id"].apply(lambda img_id: img_id in existing_images)
     missing_img_count = int((~image_exists_mask).sum())
 
