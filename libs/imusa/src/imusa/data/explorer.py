@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -20,7 +21,9 @@ logger = logging.getLogger(__name__)
 console = Console()
 
 # Set clean aesthetic style for plots
-plt.style.use("seaborn-v0_8-whitegrid" if "seaborn-v0_8-whitegrid" in plt.style.available else "default")
+plt.style.use(
+    "seaborn-v0_8-whitegrid" if "seaborn-v0_8-whitegrid" in plt.style.available else "default"
+)
 sns.set_palette("muted")
 
 
@@ -113,7 +116,9 @@ def _plot_class_distribution(df: pd.DataFrame, output_file: Path) -> None:
     palette = sns.color_palette("Set2", len(counts))
     bars = ax.bar(counts.index, counts.values, color=palette, edgecolor="black", linewidth=1)
 
-    ax.set_title("IMUSA Dataset Sentiment Class Distribution", fontsize=14, fontweight="bold", pad=15)
+    ax.set_title(
+        "IMUSA Dataset Sentiment Class Distribution", fontsize=14, fontweight="bold", pad=15
+    )
     ax.set_xlabel("Sentiment Category", fontsize=12, fontweight="bold")
     ax.set_ylabel("Number of Memes", fontsize=12, fontweight="bold")
 
@@ -141,9 +146,20 @@ def _plot_class_distribution(df: pd.DataFrame, output_file: Path) -> None:
 def _plot_text_length(df: pd.DataFrame, output_file: Path) -> None:
     """Plot word count distributions per category."""
     fig, ax = plt.subplots(figsize=(10, 5))
-    sns.boxplot(data=df, x="Category", y="word_count", hue="Category", legend=False, palette="Set2", ax=ax, width=0.5)
+    sns.boxplot(
+        data=df,
+        x="Category",
+        y="word_count",
+        hue="Category",
+        legend=False,
+        palette="Set2",
+        ax=ax,
+        width=0.5,
+    )
 
-    ax.set_title("Punjabi Text Word Count per Sentiment Category", fontsize=14, fontweight="bold", pad=15)
+    ax.set_title(
+        "Punjabi Text Word Count per Sentiment Category", fontsize=14, fontweight="bold", pad=15
+    )
     ax.set_xlabel("Category", fontsize=12, fontweight="bold")
     ax.set_ylabel("Word Count", fontsize=12, fontweight="bold")
 
@@ -156,7 +172,14 @@ def _plot_text_length(df: pd.DataFrame, output_file: Path) -> None:
 def _plot_image_stats(df: pd.DataFrame, output_file: Path) -> None:
     """Plot image dimensions scatter plot."""
     fig, ax = plt.subplots(figsize=(8, 6))
-    sns.scatterplot(data=df.dropna(subset=["img_width", "img_height"]), x="img_width", y="img_height", hue="Category", alpha=0.7, ax=ax)
+    sns.scatterplot(
+        data=df.dropna(subset=["img_width", "img_height"]),
+        x="img_width",
+        y="img_height",
+        hue="Category",
+        alpha=0.7,
+        ax=ax,
+    )
 
     ax.set_title("Meme Image Dimensions (Width vs Height)", fontsize=14, fontweight="bold", pad=15)
     ax.set_xlabel("Width (pixels)", fontsize=12, fontweight="bold")
@@ -203,7 +226,9 @@ def _create_sample_grid(df: pd.DataFrame, images_dir: Path, output_file: Path) -
 
 def _print_eda_tables(df: pd.DataFrame) -> None:
     """Print terminal summary tables of class counts and text lengths."""
-    table = Table(title="IMUSA Dataset Sentiment Class Breakdown", show_header=True, header_style="bold cyan")
+    table = Table(
+        title="IMUSA Dataset Sentiment Class Breakdown", show_header=True, header_style="bold cyan"
+    )
     table.add_column("Category", style="yellow")
     table.add_column("Sample Count", justify="right", style="green")
     table.add_column("Percentage", justify="right", style="magenta")
