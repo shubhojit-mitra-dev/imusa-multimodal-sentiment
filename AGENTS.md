@@ -84,7 +84,7 @@ make explore              # Executes dataset statistical analysis script
 6. **Never Edit Git-Ignored Outputs**: Do not commit binaries, weights (`.pt`, `.pth`), or processed data files.
 7. **No Hidden Logic**: Avoid magic numbers and hardcoded paths. All configuration options MUST derive from `imusa.config.Settings` (Pydantic BaseSettings).
 8. **Preserve Type Annotations**: Every new function must include complete type hints (`mypy` strict).
-9. **Continuous Research Paper Documentation**: Whenever new experiments, data analysis, model architecture changes, or benchmark results are added, update `docs/paper.md` and copy any generated charts to `docs/assets/`. The `docs/paper.md` file must remain a comprehensive, paper-ready single source of truth.
+9. **Continuous Research Paper Documentation & GFM Math Syntax**: Whenever new experiments, data analysis, model architecture changes, or benchmark results are added, update `docs/paper.md` and copy any generated charts to `docs/assets/`. All mathematical formulas MUST use standard GitHub Flavored Markdown math syntax (`$...$` for inline math, and `$$...$$` on separate lines for block equations). Never use `\( ... \)` or `\[ ... \]` as web previewers do not render them.
 
 ---
 
