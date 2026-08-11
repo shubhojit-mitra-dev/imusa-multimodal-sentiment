@@ -20,10 +20,12 @@ def test_explore_dataset(tmp_path: Path) -> None:
     Image.new("RGB", (200, 300)).save(img_dir / "img1.jpg")
     Image.new("RGB", (400, 400)).save(img_dir / "img2.jpg")
 
-    df = pd.DataFrame([
-        {"Id": "img1.jpg", "Category": "Sarcasm", "Text": "Sample text one"},
-        {"Id": "img2.jpg", "Category": "Neutral", "Text": "Sample text two"},
-    ])
+    df = pd.DataFrame(
+        [
+            {"Id": "img1.jpg", "Category": "Sarcasm", "Text": "Sample text one"},
+            {"Id": "img2.jpg", "Category": "Neutral", "Text": "Sample text two"},
+        ]
+    )
     df.to_csv(processed_csv, index=False)
 
     stats = explore_dataset(processed_csv=processed_csv, images_dir=img_dir, output_dir=output_dir)
