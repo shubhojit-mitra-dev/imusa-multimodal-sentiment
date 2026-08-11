@@ -5,6 +5,7 @@ Transformers (e.g. XLM-RoBERTa).
 """
 
 import logging
+from typing import cast
 
 import torch
 import torch.nn as nn
@@ -49,7 +50,11 @@ class TextEncoder(nn.Module):
                 for param in self.backbone.parameters():
                     param.requires_grad = False
         except Exception as err:
-            logger.warning("Could not load Hugging Face model %s: %s. Using Embedding fallback.", model_name, err)
+            logger.warning(
+                "Could not load Hugging Face model %s: %s. Using Embedding fallback.",
+                model_name,
+                err,
+            )
             self.backbone = None
             self.dummy_embedding = nn.Embedding(250000, hidden_dim)
 
@@ -70,16 +75,18 @@ class TextEncoder(nn.Module):
         if self.backbone is not None:
             outputs = self.backbone(input_ids=input_ids, attention_mask=attention_mask)
             if hasattr(outputs, "pooler_output") and outputs.pooler_output is not None:
-                return outputs.pooler_output
+                return cast(torch.Tensor, outputs.pooler_output)
             # Mean pooling over tokens using attention mask
             if attention_mask is not None:
-                mask_expanded = attention_mask.unsqueeze(-1).expand(outputs.last_hidden_state.size()).float()
+                mask_expanded = (
+                    attention_mask.unsqueeze(-1).expand(outputs.last_hidden_state.size()).float()
+                )
                 sum_embeddings = torch.sum(outputs.last_hidden_state * mask_expanded, 1)
                 sum_mask = mask_expanded.sum(1)
                 sum_mask = torch.clamp(sum_mask, min=1e-9)
-                return sum_embeddings / sum_mask
-            return outputs.last_hidden_state[:, 0, :]
+                return cast(torch.Tensor, sum_embeddings / sum_mask)
+            return cast(torch.Tensor, outputs.last_hidden_state[:, 0, :])
 
         # Fallback embedding
         embedded = self.dummy_embedding(input_ids)
-        return embedded.mean(dim=1)
+        return cast(torch.Tensor, embedded.mean(dim=1))

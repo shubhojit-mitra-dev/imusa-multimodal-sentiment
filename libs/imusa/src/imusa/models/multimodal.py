@@ -5,6 +5,7 @@ deep neural network architecture for 4-class Punjabi meme sentiment classificati
 """
 
 import logging
+from typing import cast
 
 import torch
 import torch.nn as nn
@@ -112,4 +113,4 @@ class IMUSAMultimodalClassifier(nn.Module):
         fused_embeds = self.fusion(vision_embeds, text_embeds)
 
         # 4. Predict sentiment logits
-        return self.classifier(fused_embeds)
+        return cast(torch.Tensor, self.classifier(fused_embeds))

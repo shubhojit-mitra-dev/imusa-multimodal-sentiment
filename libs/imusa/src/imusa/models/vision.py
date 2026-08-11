@@ -5,6 +5,7 @@ Extracts visual representation vectors from meme images using a Vision Transform
 """
 
 import logging
+from typing import cast
 
 import torch
 import torch.nn as nn
@@ -49,7 +50,9 @@ class VisionEncoder(nn.Module):
                 for param in self.backbone.parameters():
                     param.requires_grad = False
         except Exception as err:
-            logger.warning("Could not load Hugging Face model %s: %s. Using Linear fallback.", model_name, err)
+            logger.warning(
+                "Could not load Hugging Face model %s: %s. Using Linear fallback.", model_name, err
+            )
             # Fallback for offline unit testing without network downloads
             self.backbone = None
             self.dummy_projection = nn.Sequential(
@@ -71,6 +74,6 @@ class VisionEncoder(nn.Module):
             outputs = self.backbone(pixel_values=images)
             # Use pooler_output if available, else CLS token at index 0
             if hasattr(outputs, "pooler_output") and outputs.pooler_output is not None:
-                return outputs.pooler_output
-            return outputs.last_hidden_state[:, 0, :]
-        return self.dummy_projection(images)
+                return cast(torch.Tensor, outputs.pooler_output)
+            return cast(torch.Tensor, outputs.last_hidden_state[:, 0, :])
+        return cast(torch.Tensor, self.dummy_projection(images))

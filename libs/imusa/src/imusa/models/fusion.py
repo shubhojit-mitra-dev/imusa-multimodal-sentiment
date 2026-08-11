@@ -4,6 +4,8 @@ Integrates vision features (from ViT) and text features (from XLM-RoBERTa)
 via Gated Projection and Multi-Head Cross-Attention.
 """
 
+from typing import cast
+
 import torch
 import torch.nn as nn
 
@@ -77,4 +79,4 @@ class MultimodalFusion(nn.Module):
         gated_features = gate * concat_features
 
         # Project fused features
-        return self.fusion_layer(gated_features)
+        return cast(torch.Tensor, self.fusion_layer(gated_features))
