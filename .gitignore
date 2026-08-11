@@ -35,8 +35,8 @@ env.bak/
 venv.bak/
 
 # Data & Outputs (Local datasets & large binary artifacts)
-data/
-outputs/
+/data/
+/outputs/
 *.csv
 *.png
 *.jpg
