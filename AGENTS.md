@@ -71,21 +71,32 @@ make explore              # Executes dataset statistical analysis script
 
 ## 5. Strict Constraints for AI Agents
 
-1. **No Code Without Verification**: Never claim a feature or fix works without executing `make lint` and `make test`.
-2. **Never Edit Git-Ignored Outputs**: Do not commit binaries, weights (`.pt`, `.pth`), or processed data files.
-3. **Atomic Commits**: Make small, incremental, logically distinct commits with descriptive commit messages following Conventional Commits format (`feat:`, `fix:`, `chore:`, `docs:`).
-4. **No Hidden Logic**: Avoid magic numbers and hardcoded paths. All configuration options MUST derive from `imusa.config.IMUSAConfig` (Pydantic BaseSettings).
-5. **Preserve Type Annotations**: Every new function must include complete type hints.
-6. **Continuous Research Paper Documentation**: Whenever new experiments, data analysis, model architecture changes, or benchmark results are added, update `docs/paper.md` and copy any generated charts to `docs/assets/`. The `docs/paper.md` file must remain a comprehensive, paper-ready single source of truth.
+1. **No Direct Commits to `main`**: All work MUST be performed on feature branches (e.g. `feat/phase2-dataset`, `fix/csv-parser`). Never commit directly to `main`.
+2. **Super-Atomic Commits (1-2 Files Max Per Commit)**: EVERY logical change MUST be committed individually. Never group unrelated files or stage more than 1-2 files per commit. Each commit message must follow Conventional Commits format (`feat:`, `fix:`, `chore:`, `docs:`).
+3. **Branch & PR Workflow**: For every phase or feature:
+   - Create a dedicated feature branch from `main`.
+   - Make atomic commits as individual files/modules are created.
+   - Push the branch to GitHub (`git push -u origin <branch-name>`).
+   - Create a Pull Request via GitHub CLI (`gh pr create`).
+   - STOP and request user review. Do NOT merge the PR until explicit approval is given.
+4. **Self-Explanatory Code & Extensive Comments**: Write comprehensive docstrings and inline comments explaining *why* decisions were made, so the user can review code without needing constant external explanations.
+5. **No Code Without Verification**: Never claim a feature or fix works without executing `make lint` and `make test`.
+6. **Never Edit Git-Ignored Outputs**: Do not commit binaries, weights (`.pt`, `.pth`), or processed data files.
+7. **No Hidden Logic**: Avoid magic numbers and hardcoded paths. All configuration options MUST derive from `imusa.config.Settings` (Pydantic BaseSettings).
+8. **Preserve Type Annotations**: Every new function must include complete type hints (`mypy` strict).
+9. **Continuous Research Paper Documentation**: Whenever new experiments, data analysis, model architecture changes, or benchmark results are added, update `docs/paper.md` and copy any generated charts to `docs/assets/`. The `docs/paper.md` file must remain a comprehensive, paper-ready single source of truth.
 
 ---
 
 ## 6. Definition of Done (DoD)
 
 A task is considered **DONE** only when:
+- [ ] Code is created on a dedicated feature branch (never `main`).
+- [ ] Every logical unit is committed atomically (1-2 files per commit).
+- [ ] Code is extensively commented with full docstrings and inline explanations.
 - [ ] Code is formatted with `ruff format`.
 - [ ] Code passes `ruff check` with zero warnings.
 - [ ] Code passes `mypy` type checking.
 - [ ] Relevant unit tests exist in `libs/imusa/tests/` and pass via `pytest`.
-- [ ] Clear documentation and docstrings accompany new functions.
 - [ ] `docs/paper.md` is updated with any new empirical findings, formulations, assets, or literature notes.
+- [ ] Branch is pushed to GitHub and a Pull Request is opened for user review.
