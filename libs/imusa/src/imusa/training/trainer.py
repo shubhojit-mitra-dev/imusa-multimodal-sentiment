@@ -171,7 +171,7 @@ class Trainer:
         Returns:
             Dictionary containing best validation Macro F1 score and epoch logs.
         """
-        best_macro_f1 = 0.0
+        best_macro_f1 = -1.0
         best_checkpoint_path = self.output_dir / "best_model.pt"
 
         logger.info("Starting training loop for %d epochs...", epochs)
