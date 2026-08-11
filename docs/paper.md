@@ -81,12 +81,36 @@ The imbalance ratio between the majority class (`Sarcasm`) and minority class (`
 
 ---
 
-## 3. System Architecture & Methodology Plan
+## 3. System Architecture & Methodology
 
-### 3.1 Proposed Multimodal Dual-Encoder Architecture
-1. **Text Encoder \( e_t \)**: `xlm-roberta-base` (multilingual transformer trained on 100+ languages including Punjabi).
-2. **Vision Encoder \( e_v \)**: `google/vit-base-patch16-224` (Vision Transformer pre-trained on ImageNet-21k).
-3. **Fusion Layer \( f_{\text{fusion}} \)**: Cross-Attention Multi-Head Fusion Module projecting visual tokens into textual key/value spaces.
+### 3.1 Dual-Encoder Feature Extraction
+The multimodal architecture leverages pre-trained deep transformers for both modalities:
+1. **Vision Encoder \( e_v \)**: Given meme image \( V \in \mathbb{R}^{3 \times 224 \times 224} \), `google/vit-base-patch16-224` extracts 196 patch tokens of dimension 768. The pooled `[CLS]` visual embedding is \( \mathbf{h}_v \in \mathbb{R}^{768} \).
+2. **Text Encoder \( e_t \)**: Given Gurmukhi token sequence \( T \), `xlm-roberta-base` processes sequence embeddings to yield textual pooled representation \( \mathbf{h}_t \in \mathbb{R}^{768} \).
+
+### 3.2 Gated Multimodal Fusion Module
+To dynamically balance textual and visual evidence, representations are fused via a learned gating mechanism:
+\[
+\mathbf{x}_{\text{concat}} = [\mathbf{h}_v \,;\, \mathbf{h}_t] \in \mathbb{R}^{1536}
+\]
+\[
+\mathbf{g} = \sigma(W_g \mathbf{x}_{\text{concat}} + \mathbf{b}_g) \in (0, 1)^{1536}
+\]
+\[
+\mathbf{h}_{\text{fused}} = \text{GELU}\left(\text{LayerNorm}(W_f (\mathbf{g} \odot \mathbf{x}_{\text{concat}}) + \mathbf{b}_f)\right) \in \mathbb{R}^{1536}
+\]
+
+### 3.3 Classification Head & Objective Function
+Logits are computed via a multi-layer perceptron:
+\[
+\mathbf{z} = W_2 \left(\text{Dropout}\left(\text{GELU}\left(\text{LayerNorm}(W_1 \mathbf{h}_{\text{fused}} + \mathbf{b}_1)\right)\right)\right) + \mathbf{b}_2 \in \mathbb{R}^4
+\]
+
+To resolve the 25:1 imbalance, optimization uses Focal Loss with balanced class weights \( \alpha_c = \frac{N}{K \cdot N_c} \):
+\[
+\mathcal{L}_{\text{Focal}} = -\sum_{c=1}^K \alpha_c (1 - p_c)^\gamma y_c \log(p_c)
+\]
+where \( p_c = \text{softmax}(\mathbf{z})_c \) and \( \gamma = 2.0 \).
 
 ---
 
