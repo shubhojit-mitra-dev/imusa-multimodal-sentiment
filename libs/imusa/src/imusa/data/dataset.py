@@ -10,8 +10,8 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
-from PIL import Image
 import torch
+from PIL import Image
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
 
@@ -143,9 +143,7 @@ class IMUSADataset(Dataset):  # type: ignore[type-arg]
         # 3. Attach sentiment label if not test set
         if not self.is_test and "Category" in row and pd.notna(row["Category"]):
             cat_str = str(row["Category"])
-            sample["label"] = torch.tensor(
-                self.category_to_idx.get(cat_str, 0), dtype=torch.long
-            )
+            sample["label"] = torch.tensor(self.category_to_idx.get(cat_str, 0), dtype=torch.long)
 
         return sample
 

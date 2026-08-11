@@ -4,8 +4,8 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
-from PIL import Image
 import torch
+from PIL import Image
 
 from imusa.data.dataset import IMUSADataset, create_stratified_dataloaders
 
