@@ -17,13 +17,19 @@ def test_compute_inverse_class_weights() -> None:
     )
     df = pd.DataFrame(data)
 
+    from imusa.config import settings
+
     weights = compute_inverse_class_weights(df, num_classes=4)
 
     assert weights.shape == (4,)
-    # Index 0 is Sarcasm (10 samples), Index 3 is Offensive (1 sample)
+    sarcasm_idx = settings.categories.index("Sarcasm")
+    offensive_idx = settings.categories.index("Offensive")
+
     # Offensive weight should be 10x higher than Sarcasm weight
-    assert weights[3].item() > weights[0].item()
-    assert torch.isclose(weights[3] / weights[0], torch.tensor(10.0), atol=1e-1)
+    assert weights[offensive_idx].item() > weights[sarcasm_idx].item()
+    assert torch.isclose(
+        weights[offensive_idx] / weights[sarcasm_idx], torch.tensor(10.0), atol=1e-1
+    )
 
 
 def test_focal_loss_forward() -> None:

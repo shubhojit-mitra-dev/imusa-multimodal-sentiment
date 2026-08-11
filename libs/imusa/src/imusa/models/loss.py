@@ -50,7 +50,7 @@ def compute_inverse_class_weights(
         weights.append(weight)
 
     weight_tensor = torch.tensor(weights, dtype=torch.float32)
-    logger.info("Computed balanced class weights: %s", dict(zip(settings.categories, weights)))
+    logger.info("Computed balanced class weights: %s", dict(zip(settings.categories, weights, strict=False)))
     return weight_tensor
 
 
