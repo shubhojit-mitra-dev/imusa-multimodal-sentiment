@@ -76,6 +76,7 @@ make explore              # Executes dataset statistical analysis script
 3. **Atomic Commits**: Make small, incremental, logically distinct commits with descriptive commit messages following Conventional Commits format (`feat:`, `fix:`, `chore:`, `docs:`).
 4. **No Hidden Logic**: Avoid magic numbers and hardcoded paths. All configuration options MUST derive from `imusa.config.IMUSAConfig` (Pydantic BaseSettings).
 5. **Preserve Type Annotations**: Every new function must include complete type hints.
+6. **Continuous Research Paper Documentation**: Whenever new experiments, data analysis, model architecture changes, or benchmark results are added, update `docs/paper.md` and copy any generated charts to `docs/assets/`. The `docs/paper.md` file must remain a comprehensive, paper-ready single source of truth.
 
 ---
 
@@ -87,3 +88,4 @@ A task is considered **DONE** only when:
 - [ ] Code passes `mypy` type checking.
 - [ ] Relevant unit tests exist in `libs/imusa/tests/` and pass via `pytest`.
 - [ ] Clear documentation and docstrings accompany new functions.
+- [ ] `docs/paper.md` is updated with any new empirical findings, formulations, assets, or literature notes.
