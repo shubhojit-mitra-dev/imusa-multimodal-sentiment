@@ -52,7 +52,7 @@ def parse_raw_csv(csv_path: Path) -> pd.DataFrame:
             if len(row) >= 3:
                 image_id = row[0].strip()
                 category = row[1].strip()
-                text = ",".join(row[2:]).strip() # In case comma was inside text
+                text = ",".join(row[2:]).strip()  # In case comma was inside text
                 rows.append({"Id": image_id, "Category": category, "Text": text})
             elif len(row) == 2:
                 rows.append({"Id": row[0].strip(), "Category": row[1].strip(), "Text": ""})
@@ -138,7 +138,9 @@ def clean_dataset(
 
 def _print_summary(summary: CleaningSummary) -> None:
     """Print clean terminal summary table of dataset pipeline status."""
-    table = Table(title="IMUSA Dataset Cleaning Report", show_header=True, header_style="bold magenta")
+    table = Table(
+        title="IMUSA Dataset Cleaning Report", show_header=True, header_style="bold magenta"
+    )
     table.add_column("Pipeline Stage", style="cyan")
     table.add_column("Count", justify="right", style="green")
 
