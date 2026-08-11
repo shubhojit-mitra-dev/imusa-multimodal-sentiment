@@ -51,7 +51,7 @@ indent-style = "space"
 
 [tool.pytest.ini_options]
 testpaths = ["libs/imusa/tests"]
-addopts = "--import-mode=importlib -v --cov=imusa --cov-report=term-summary"
+addopts = "--import-mode=importlib -v --cov=imusa --cov-report=term-missing"
 pythonpath = ["libs/imusa/src"]
 
 [tool.mypy]
