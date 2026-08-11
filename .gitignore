@@ -41,6 +41,9 @@ venv.bak/
 *.png
 *.jpg
 *.jpeg
+!docs/assets/*.png
+!docs/assets/*.jpg
+!docs/assets/*.jpeg
 *.pth
 *.pt
 *.onnx
