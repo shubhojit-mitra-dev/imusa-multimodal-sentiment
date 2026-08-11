@@ -11,9 +11,7 @@ def test_parse_raw_csv(tmp_path: Path) -> None:
     """Test parsing raw CSV with multiline and quoted strings."""
     csv_file = tmp_path / "raw.csv"
     csv_file.write_text(
-        'Id,Category,Text\n'
-        'img1.jpg,Sarcasm,"Line 1\nLine 2"\n'
-        'img2.jpg,Neutral,Simple string\n',
+        'Id,Category,Text\nimg1.jpg,Sarcasm,"Line 1\nLine 2"\nimg2.jpg,Neutral,Simple string\n',
         encoding="utf-8",
     )
 
