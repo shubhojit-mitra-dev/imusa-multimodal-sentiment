@@ -1,0 +1,62 @@
+[project]
+name = "imusa-monorepo-root"
+version = "0.1.0"
+description = "Indic Meme Understanding & Sentiment Analysis (IMUSA) - Monorepo"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = [
+    "libs/*",
+    "apps/*",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.1.0",
+    "ruff>=0.9.0",
+    "mypy>=1.10.0",
+    "pre-commit>=3.7.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["libs/imusa/src", "scripts", "apps"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # Pyflakes
+    "W",   # pycodestyle warnings
+    "I",   # isort
+    "C90", # mccabe complexity
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+    "N",   # pep8-naming
+]
+ignore = ["E501"] # Line length handled by formatter
+
+[tool.ruff.lint.isort]
+known-first-party = ["imusa"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.pytest.ini_options]
+testpaths = ["libs/imusa/tests"]
+addopts = "--import-mode=importlib -v --cov=imusa --cov-report=term-summary"
+pythonpath = ["libs/imusa/src"]
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
