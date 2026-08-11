@@ -9,9 +9,9 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-from sklearn.metrics import accuracy_score, classification_report, precision_recall_fscore_support
 import torch
 import torch.nn as nn
+from sklearn.metrics import accuracy_score, classification_report, precision_recall_fscore_support
 from torch.utils.data import DataLoader
 
 from imusa.config import settings
@@ -68,7 +68,7 @@ class Trainer:
         else:
             self.device = device
 
-        self.output_dir = output_dir or (settings.outputs_dir / "checkpoints")
+        self.output_dir = output_dir or (settings.output_dir / "checkpoints")
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
         self.model.to(self.device)
@@ -113,8 +113,8 @@ class Trainer:
         """
         self.model.eval()
         total_loss = 0.0
-        all_preds = []
-        all_labels = []
+        all_preds: list[int] = []
+        all_labels: list[int] = []
 
         with torch.no_grad():
             for batch in self.val_loader:
@@ -212,6 +212,10 @@ class Trainer:
                     },
                     best_checkpoint_path,
                 )
-                logger.info("Saved new best model checkpoint to %s (Macro F1=%.4f)", best_checkpoint_path, best_macro_f1)
+                logger.info(
+                    "Saved new best model checkpoint to %s (Macro F1=%.4f)",
+                    best_checkpoint_path,
+                    best_macro_f1,
+                )
 
         return {"best_macro_f1": best_macro_f1, "history": history}

@@ -3,7 +3,6 @@
 
 import argparse
 import logging
-from pathlib import Path
 
 import torch
 import torch.nn as nn
@@ -25,7 +24,9 @@ logger = logging.getLogger("imusa.scripts.train")
 def parse_args() -> argparse.Namespace:
     """Parse command line options for model training."""
     parser = argparse.ArgumentParser(description="Train IMUSA Multimodal Sentiment Model")
-    parser.add_argument("--epochs", type=int, default=5, help="Number of training epochs (default: 5)")
+    parser.add_argument(
+        "--epochs", type=int, default=5, help="Number of training epochs (default: 5)"
+    )
     parser.add_argument("--batch-size", type=int, default=16, help="Mini-batch size (default: 16)")
     parser.add_argument("--lr", type=float, default=2e-5, help="Learning rate (default: 2e-5)")
     parser.add_argument(
@@ -66,7 +67,6 @@ def main() -> None:
         logger.warning("Could not download HF tokenizer: %s. Using dummy tokenizer fallback.", err)
 
         class DummyTokenizerWrapper:
-
             def __call__(self, text: str, **kwargs: str | int | bool) -> dict[str, torch.Tensor]:
                 max_len = int(kwargs.get("max_length", 128))
                 return {
@@ -103,7 +103,7 @@ def main() -> None:
         val_loader=val_loader,
         criterion=criterion,
         optimizer=optimizer,
-        output_dir=settings.outputs_dir / "checkpoints",
+        output_dir=settings.output_dir / "checkpoints",
     )
 
     results = trainer.fit(epochs=epochs)
