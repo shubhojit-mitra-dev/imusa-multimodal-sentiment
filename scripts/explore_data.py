@@ -16,9 +16,15 @@ logging.basicConfig(
 def main() -> None:
     """Parse CLI args and trigger EDA visualization pipeline."""
     parser = argparse.ArgumentParser(description="Run Exploratory Data Analysis on IMUSA dataset.")
-    parser.add_argument("--processed-csv", type=Path, default=None, help="Path to cleaned dataset CSV")
-    parser.add_argument("--images-dir", type=Path, default=None, help="Path to training images directory")
-    parser.add_argument("--output-dir", type=Path, default=None, help="Destination directory for EDA plot artifacts")
+    parser.add_argument(
+        "--processed-csv", type=Path, default=None, help="Path to cleaned dataset CSV"
+    )
+    parser.add_argument(
+        "--images-dir", type=Path, default=None, help="Path to training images directory"
+    )
+    parser.add_argument(
+        "--output-dir", type=Path, default=None, help="Destination directory for EDA plot artifacts"
+    )
 
     args = parser.parse_args()
 
