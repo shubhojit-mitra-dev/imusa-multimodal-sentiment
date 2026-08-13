@@ -41,6 +41,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Execute fast 1-epoch dry-run on 20 samples for verification",
     )
+    parser.add_argument(
+        "--warmup-ratio",
+        type=float,
+        default=0.1,
+        help="Warmup step ratio for cosine learning rate scheduler (default: 0.1)",
+    )
     return parser.parse_args()
 
 
@@ -97,12 +103,19 @@ def main() -> None:
     model = IMUSAMultimodalClassifier(num_classes=4)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-2)
 
+    from imusa.training.trainer import get_cosine_schedule_with_warmup
+
+    total_steps = epochs * len(train_loader)
+    warmup_steps = int(total_steps * args.warmup_ratio)
+    scheduler = get_cosine_schedule_with_warmup(optimizer, num_warmup_steps=warmup_steps, num_training_steps=total_steps)
+
     trainer = Trainer(
         model=model,
         train_loader=train_loader,
         val_loader=val_loader,
         criterion=criterion,
         optimizer=optimizer,
+        scheduler=scheduler,
         output_dir=settings.output_dir / "checkpoints",
     )
 
