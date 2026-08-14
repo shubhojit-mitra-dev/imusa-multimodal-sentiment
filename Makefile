@@ -10,6 +10,7 @@ help:
 	@echo "  make test        - Run unit tests with pytest and coverage report"
 	@echo "  make clean-data  - Clean raw train CSV and generate processed data"
 	@echo "  make explore     - Generate dataset statistics and visualization report"
+	@echo "  make pack-data   - Package data/ directory into data.zip for Google Colab upload"
 	@echo "  make setup-hooks - Install git pre-commit hooks"
 	@echo "  make all         - Run lint, test, and data pipeline verification"
 
@@ -33,6 +34,9 @@ clean-data:
 
 explore:
 	$(PYTHON) scripts/explore_data.py
+
+pack-data:
+	zip -r data.zip data/ -x "*.DS_Store*" "*__pycache__*"
 
 setup-hooks:
 	uv run pre-commit install
