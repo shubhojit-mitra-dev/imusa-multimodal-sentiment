@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     output_dir: Path = base_dir / "outputs"
     exploration_output_dir: Path = output_dir / "exploration"
 
+    # Pre-trained Model Hub Names
+    vision_model_name: str = "google/vit-base-patch16-224"
+    text_model_name: str = "xlm-roberta-base"
+
     # Sentiment Class Definitions
     categories: ClassVar[list[str]] = ["Sarcasm", "Neutral", "Offensive", "Motivational"]
     num_classes: ClassVar[int] = 4

@@ -54,7 +54,8 @@ def run_prediction_pipeline(
 
     from transformers import AutoTokenizer
 
-    tokenizer = AutoTokenizer.from_pretrained(settings.text_model_name)
+    model_name = getattr(settings, "text_model_name", "xlm-roberta-base")
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
     test_dataset = IMUSADataset(
         df=test_df,
         images_dir=settings.test_images_dir,
