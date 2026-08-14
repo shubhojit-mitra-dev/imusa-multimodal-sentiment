@@ -133,10 +133,11 @@ class IMUSADataset(Dataset):  # type: ignore[type-arg]
         # 1. Load and transform vision modality
         img_path = self.images_dir / image_id
         if not img_path.exists():
-            # Try appending common extensions if missing
-            for ext in [".jpg", ".png", ".jpeg"]:
-                if (self.images_dir / f"{image_id}{ext}").exists():
-                    img_path = self.images_dir / f"{image_id}{ext}"
+            stem = Path(image_id).stem
+            for ext in [".jpg", ".jpeg", ".png", ".JPG", ".JPEG", ".PNG"]:
+                candidate = self.images_dir / f"{stem}{ext}"
+                if candidate.exists():
+                    img_path = candidate
                     break
 
         try:
