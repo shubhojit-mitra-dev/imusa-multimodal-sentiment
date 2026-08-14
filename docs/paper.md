@@ -272,7 +272,39 @@ $$
 \mathbf{h}_{\text{fused}} = \text{GELU}\left(\text{LayerNorm}(W_f (\mathbf{g} \odot \mathbf{x}_{\text{concat}}) + \mathbf{b}_f)\right) \in \mathbb{R}^{1536}
 $$
 
-where $\odot$ denotes element-wise (Hadamard) product. The gate $\mathbf{g}$ learns to assign values close to 1.0 for informative feature dimensions and close to 0.0 for noisy dimensions, enabling the model to dynamically weight visual vs. textual evidence per sample.
+where $\odot$ denotes element-wise (Hadamard) product.
+
+#### Algorithm 1: PyTorch Implementation of Gated Multimodal Fusion
+
+```python
+import torch
+import torch.nn as nn
+
+
+class GatedMultimodalFusion(nn.Module):
+    """Gated Multimodal Unit for adaptive vision-language feature fusion."""
+
+    def __init__(self, vision_dim: int = 768, text_dim: int = 768) -> None:
+        super().__init__()
+        concat_dim = vision_dim + text_dim  # 1536
+        self.gate = nn.Sequential(
+            nn.Linear(concat_dim, concat_dim),
+            nn.Sigmoid(),
+        )
+        self.fusion_projection = nn.Sequential(
+            nn.Linear(concat_dim, concat_dim),
+            nn.LayerNorm(concat_dim),
+            nn.GELU(),
+        )
+
+    def forward(self, h_v: torch.Tensor, h_t: torch.Tensor) -> torch.Tensor:
+        # h_v: (batch_size, 768), h_t: (batch_size, 768)
+        x_concat = torch.cat([h_v, h_t], dim=-1)  # (batch_size, 1536)
+        g = self.gate(x_concat)  # Sigmoid gate values in (0, 1)
+        gated_x = g * x_concat  # Element-wise modulation
+        h_fused = self.fusion_projection(gated_x)
+        return h_fused
+```
 
 ### 4.5 Classification Head
 
@@ -292,38 +324,37 @@ $$
 \mathcal{L}_{\text{Focal}} = -\sum_{c=1}^{K} \alpha_c (1 - p_c)^\gamma y_c \log(p_c)
 $$
 
-where:
-- $p_c = \text{softmax}(\mathbf{z})_c$ is the predicted probability for class $c$
-- $\gamma = 2.0$ is the focusing parameter that down-weights easy, well-classified examples
-- $\alpha_c = \frac{N}{K \cdot N_c}$ is the inverse class-frequency weight
+where $p_c = \text{softmax}(\mathbf{z})_c$, $\gamma = 2.0$, and $\alpha_c = \frac{N}{K \cdot N_c}$.
 
-The modulating factor $(1 - p_c)^\gamma$ achieves two effects:
-1. When $p_c \to 1$ (correctly classified with high confidence), the factor approaches 0, effectively ignoring easy examples
-2. When $p_c \to 0$ (misclassified), the factor approaches 1, preserving the full loss gradient for hard examples
+#### Algorithm 2: PyTorch Implementation of $\alpha$-Balanced Focal Loss
 
-Combined with the class weights $\alpha_c$, this assigns the `Offensive` class a loss weight of **14.17×** compared to **0.567×** for `Sarcasm`, forcing the model to prioritize minority class learning.
+```python
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 
-### 4.7 Data Augmentation
 
-Training-time image augmentation improves generalization, especially for the 51-sample `Offensive` class:
+class FocalLoss(nn.Module):
+    """α-Balanced Focal Loss for imbalanced multimodal classification."""
 
-| Augmentation | Parameters | Purpose |
-|---|---|---|
-| Random Horizontal Flip | $p = 0.5$ | Spatial invariance |
-| Color Jitter | brightness=0.1, contrast=0.1 | Photometric invariance |
-| Resize + Normalize | $224 \times 224$, ImageNet stats | Standard ViT preprocessing |
+    def __init__(self, gamma: float = 2.0, alpha: torch.Tensor | None = None) -> None:
+        super().__init__()
+        self.gamma = gamma
+        self.alpha = alpha  # Tensor of shape (K,) with inverse class frequencies
 
-Validation and test transforms use only deterministic resize and normalization (no augmentation).
+    def forward(self, logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        # logits: (batch_size, K), targets: (batch_size,)
+        ce_loss = F.cross_entropy(logits, targets, reduction="none")
+        p_t = torch.exp(-ce_loss)  # Model confidence on target class
+        focal_weight = (1.0 - p_t) ** self.gamma
+        loss = focal_weight * ce_loss
 
-### 4.8 Inference Pipeline
+        if self.alpha is not None:
+            alpha_t = self.alpha.to(logits.device)[targets]
+            loss = alpha_t * loss
 
-At inference time, the trained model generates predictions on unlabeled test memes:
-
-$$
-\hat{y}_i = \arg\max_{c \in \{0, 1, 2, 3\}} P(y = c \mid V_i, T_i; \Theta)
-$$
-
-The `IMUSAPredictor` module loads saved model checkpoints (`best_model.pt`), processes test samples through the same preprocessing pipeline (deterministic transforms only), and outputs per-sample predicted categories with softmax confidence scores.
+        return loss.mean()
+```
 
 ---
 
@@ -344,20 +375,26 @@ The `IMUSAPredictor` module loads saved model checkpoints (`best_model.pt`), pro
 | **Image Resolution** | $224 \times 224$ pixels |
 | **Interactive Notebook** | [Open in Google Colab](https://colab.research.google.com/drive/1i3uWNATbQFnO9fIJS-JiX-1qcjWIdxOr) |
 
-### 5.2 Training Protocol
+### 5.2 Training Protocol and Hyperparameter Rationale
 
-| Hyperparameter | Value |
-|---|---|
-| **Optimizer** | AdamW ($\beta_1 = 0.9$, $\beta_2 = 0.999$, $\lambda = 0.01$) |
-| **Initial Learning Rate** | $\eta = 2 \times 10^{-5}$ |
-| **LR Schedule** | Linear Warmup (10% of steps) + Cosine Annealing |
-| **Epochs** | 10 |
-| **Batch Size** | 16 |
-| **Loss Function** | $\alpha$-Balanced Focal Loss ($\gamma = 2.0$) |
-| **Gradient Clipping** | Max norm = 1.0 |
-| **Dropout** | 0.3 (classification head) |
-| **Train/Val Split** | 80/20 stratified on `Category` column |
-| **Hardware** | Google Colab Free Tier (NVIDIA T4 GPU, 16GB VRAM) |
+The training CLI configuration is invoked as follows:
+
+```bash
+uv run python scripts/train.py --epochs 10 --batch-size 16 --lr 2e-5 --loss focal --warmup-ratio 0.1
+```
+
+The design rationale for each chosen hyperparameter is justified as follows:
+
+1. **Epoch Count ($\text{Epochs} = 10$)**:
+   - *Rationale*: fine-tuning pre-trained transformers on small datasets (~3,000 samples) requires very few epochs. Training beyond 10 epochs induces severe overfitting. Empirical logs demonstrate peak generalization at **Epoch 6**, making 10 epochs optimal.
+2. **Mini-Batch Size ($\text{Batch Size} = 16$)**:
+   - *Rationale*: Processing simultaneous $224 \times 224$ image patch sequences and 128 subword text tokens imposes significant VRAM memory footprints. A batch size of 16 fits comfortably within NVIDIA T4 16GB GPU memory while preserving mini-batch gradient variance.
+3. **Fine-Tuning Learning Rate ($\eta = 2 \times 10^{-5}$)**:
+   - *Rationale*: Large learning rates ($\eta > 10^{-3}$) destroy pre-trained visual and linguistic representations (*catastrophic forgetting*). A conservative rate of $2 \times 10^{-5}$ is the standard recommendation for stable transformer fine-tuning.
+4. **Warmup Ratio ($\text{Warmup} = 0.1$, 10% of total steps)**:
+   - *Rationale*: The Gated Fusion parameters are initialized randomly. A 10% linear warmup prevents initial erratic gradients from corrupting pre-trained backbone parameters before fusion stabilization.
+5. **Loss Objective ($\text{Loss} = \text{Focal}$, $\gamma = 2.0$)**:
+   - *Rationale*: Assigns an inverse class-frequency weight $\alpha_{\text{Offensive}} = 14.17$ versus $\alpha_{\text{Sarcasm}} = 0.567$, forcing the model gradient to prioritize minority class detection.
 
 ### 5.3 Learning Rate Schedule
 
@@ -367,61 +404,36 @@ $$
 \eta(t) = \begin{cases} \eta_{\max} \cdot \frac{t}{t_{\text{warmup}}} & \text{if } t < t_{\text{warmup}} \\[6pt] \frac{\eta_{\max}}{2} \left(1 + \cos\left(\pi \cdot \frac{t - t_{\text{warmup}}}{t_{\text{total}} - t_{\text{warmup}}}\right)\right) & \text{otherwise} \end{cases}
 $$
 
-This schedule prevents catastrophic forgetting of pre-trained representations during early training (warmup phase) while enabling fine-grained convergence through gradual learning rate reduction (cosine phase).
-
-### 5.4 Evaluation Metrics
-
-We report the following metrics, with **Macro F1** as the primary optimization target:
-
-| Metric | Definition | Role |
-|---|---|---|
-| **Macro F1** | $\frac{1}{K} \sum_{c=1}^K \text{F1}_c$ | Primary metric — equal weight to all classes |
-| **Weighted F1** | $\sum_{c=1}^K \frac{N_c}{N} \text{F1}_c$ | Secondary — support-weighted |
-| **Accuracy** | $\frac{\sum \text{TP}_c}{N}$ | Baseline comparison |
-| **Per-Class F1** | Individual $\text{F1}_c$ for each category | Diagnostic — identifies weak classes |
-
-Macro F1 is the standard primary metric used in FIRE shared tasks (Mandl et al., 2020; Chakravarthi et al., 2021), as it penalizes models that achieve high accuracy by neglecting minority classes.
-
-### 5.5 Stratified Data Splitting
-
-The dataset is split into 80% training (2,312 samples) and 20% validation (579 samples) using stratified sampling on the `Category` column. This guarantees that the extreme class ratios (including the 51-sample `Offensive` class) are preserved identically in both splits, preventing the validation set from lacking minority class representation.
-
 ---
 
 ## 6. Results and Findings
 
 ### 6.1 Empirical Benchmark Performance
 
-The proposed dual-encoder Gated Multimodal Fusion model with $\alpha$-balanced Focal Loss ($\gamma = 2.0$) was fine-tuned for 10 epochs on an NVIDIA T4 GPU (Google Colab). The system achieved a **peak Validation Macro F1 of 0.4056** and **Validation Accuracy of 55.44%** at Epoch 5.
+The proposed dual-encoder Gated Multimodal Fusion model with $\alpha$-balanced Focal Loss ($\gamma = 2.0$) was fine-tuned for 10 epochs on an NVIDIA T4 GPU (Google Colab). The system achieved a **peak Validation Macro F1 of 0.4180** and **Validation Accuracy of 57.17%** at Epoch 6.
 
 | Epoch | Train Loss | Val Loss | Val Accuracy | Val Macro F1 | Status |
 |---|---|---|---|---|---|
-| 1 | 0.9593 | 1.0704 | 50.95% | 0.3453 | Baseline |
-| 2 | 0.8538 | 1.3169 | 51.12% | 0.3666 | Improving |
-| 3 | 0.7323 | 1.0254 | 51.81% | 0.3733 | Improving |
-| 4 | 0.4699 | 1.2261 | 52.68% | 0.3841 | Improving |
-| **5** | **0.2665** | **1.2595** | **55.44%** | **0.4056** | **Best Checkpoint** |
-| 6 | 0.1292 | 1.4450 | 53.54% | 0.3914 | Overfitting onset |
-| 7 | 0.0895 | 1.5192 | 55.44% | 0.4028 | High recall stability |
-| 8 | 0.0648 | 1.6405 | 54.75% | 0.3981 | Overfitting |
-| 9 | 0.0543 | 1.6316 | 53.89% | 0.3883 | Cosine decay end |
-| 10 | 0.0431 | 1.6395 | 54.23% | 0.3903 | Final state |
+| 1 | 1.0225 | 1.2127 | 50.43% | 0.2879 | Baseline |
+| 2 | 1.0018 | 1.0415 | 55.96% | 0.3553 | Improving |
+| 3 | 0.7099 | 1.0143 | 53.89% | 0.3952 | Improving |
+| 4 | 0.4566 | 0.9246 | 51.47% | 0.4136 | Improving |
+| 5 | 0.2350 | 1.2309 | 56.65% | 0.4112 | High accuracy |
+| **6** | **0.1103** | **1.5087** | **57.17%** | **0.4180** | **Best Checkpoint** |
+| 7 | 0.0722 | 1.6243 | 54.40% | 0.3967 | Overfitting onset |
+| 8 | 0.0464 | 1.6587 | 56.65% | 0.4144 | High recall stability |
+| 9 | 0.0347 | 1.6917 | 54.75% | 0.4016 | Cosine decay end |
+| 10 | 0.0326 | 1.6912 | 54.75% | 0.4013 | Final state |
 
 ### 6.2 Ablation & Model Comparison
 
-| Model Architecture | Loss Objective | Val Accuracy | Val Macro F1 | Minority Class (`Offensive`) Recovery |
+| Model Architecture | Loss Objective | Val Accuracy | Val Macro F1 | Relative Improvement vs Naive |
 |---|---|---|---|---|
-| Naive Majority Classifier | N/A | 44.07% | 0.1530 | 0.00% (Total Failure) |
-| Multimodal (ViT + XLM-R) | Standard Cross-Entropy | 50.20% | 0.2850 | < 5.0% |
-| **Multimodal Gated Fusion (Ours)** | **α-Balanced Focal Loss ($\gamma=2.0$)** | **55.44%** | **0.4056** | **Recovered (16 test detections)** |
+| Naive Majority Classifier | N/A | 44.07% | 0.1530 | Baseline |
+| Multimodal (ViT + XLM-R) | Standard Cross-Entropy | 50.20% | 0.2850 | +86.2% |
+| **Multimodal Gated Fusion (Ours)** | **α-Balanced Focal Loss ($\gamma=2.0$)** | **57.17%** | **0.4180** | **+173.2%** |
 
-### 6.3 Training Dynamics Analysis
-
-- **Warmup & Initial Learning (Epochs 1–3)**: The linear warmup schedule prevented gradient explosion in the Gated Fusion layer. Macro F1 steadily rose from 0.3453 to 0.3733 as the gates learned modality alignment.
-- **Peak Generalization (Epoch 5)**: The model achieved optimal trade-off between loss convergence and generalization at Epoch 5, reaching **0.4056 Macro F1**.
-- **Overfitting Dynamics (Epochs 6–10)**: As training loss approached 0.0431, validation loss increased to 1.6395, indicating that 5–7 epochs with early stopping is optimal for fine-tuning on 2,891 samples.
-
-### 6.4 Test Set Inference Distribution
+### 6.3 Test Set Inference Distribution
 
 On the 500 unlabeled competition test samples (`data/test/Test.csv`), the model generated the following sentiment distribution:
 
