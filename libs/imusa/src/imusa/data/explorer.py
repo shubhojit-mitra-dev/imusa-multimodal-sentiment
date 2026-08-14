@@ -1,8 +1,11 @@
 """Exploratory Data Analysis (EDA) and Visualization Engine for IMUSA Dataset."""
 
 import logging
+import os
 from pathlib import Path
 from typing import Any
+
+os.environ["MPLBACKEND"] = "Agg"
 
 import matplotlib
 

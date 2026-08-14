@@ -84,6 +84,12 @@ def clean_dataset(
 
     logger.info("Starting dataset cleaning pipeline on %s", raw_path)
 
+    if not raw_path.exists():
+        raise FileNotFoundError(
+            f"\n\n[ERROR] Raw dataset CSV file not found at: '{raw_path}'\n"
+            f"If running on Google Colab, ensure you upload your 'data.zip' or mount Google Drive containing the 'data/' directory!\n"
+        )
+
     # 1. Read Raw Data
     df_raw = parse_raw_csv(raw_path)
     total_raw = len(df_raw)
