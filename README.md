@@ -2,6 +2,10 @@
 
 > Multimodal AI System for Punjabi Meme Sentiment Analysis.
 
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1i3uWNATbQFnO9fIJS-JiX-1qcjWIdxOr)
+[![Code Quality](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
+[![Type Checked](https://img.shields.io/badge/mypy-strict-blue.svg)](https://mypy-lang.org/)
+
 ---
 
 ## 📌 Project Overview
