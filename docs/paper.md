@@ -1,8 +1,8 @@
 # Multimodal Sentiment Classification of Punjabi Memes Using Gated Vision-Language Fusion with Focal Loss
 
-**Authors**: Shubhojit Mitra
+**Authors**: Shubhojit Mitra (SAP ID: 500120225), Utkarsh Kapoor (SAP ID: 500120618)
 
-**Affiliation**: *(To be filled)*
+**Affiliation**: University of Petroleum and Energy Studies (UPES), Dehradun
 
 **Submitted to**: IMUSA Shared Task @ FIRE 2026 — Forum for Information Retrieval Evaluation
 
