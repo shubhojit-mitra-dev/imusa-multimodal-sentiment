@@ -5,6 +5,7 @@ Macro F1 evaluation, per-class metric reporting, and checkpoint management.
 """
 
 import logging
+import math
 from pathlib import Path
 from typing import Any
 
@@ -15,8 +16,6 @@ from sklearn.metrics import accuracy_score, classification_report, precision_rec
 from torch.utils.data import DataLoader
 
 from imusa.config import settings
-
-import math
 
 logger = logging.getLogger(__name__)
 

@@ -51,7 +51,12 @@ def plot_confusion_matrix(
         cbar_kws={"label": "Normalized Ratio"},
     )
 
-    ax.set_title("IMUSA Multimodal Model — Normalized Confusion Matrix", fontsize=13, fontweight="bold", pad=12)
+    ax.set_title(
+        "IMUSA Multimodal Model — Normalized Confusion Matrix",
+        fontsize=13,
+        fontweight="bold",
+        pad=12,
+    )
     ax.set_xlabel("Predicted Category", fontsize=11, labelpad=8)
     ax.set_ylabel("True Ground Truth Category", fontsize=11, labelpad=8)
     plt.tight_layout()
@@ -95,7 +100,15 @@ def plot_training_curves(
     ax1.set_xlabel("Epoch", fontsize=11, labelpad=8)
     ax1.set_ylabel("Loss", color=color_train, fontsize=11, labelpad=8)
     ax1.plot(epochs, train_losses, color=color_train, marker="o", linewidth=2, label="Train Loss")
-    ax1.plot(epochs, val_losses, color=color_val, marker="s", linewidth=2, linestyle="--", label="Val Loss")
+    ax1.plot(
+        epochs,
+        val_losses,
+        color=color_val,
+        marker="s",
+        linewidth=2,
+        linestyle="--",
+        label="Val Loss",
+    )
     ax1.tick_params(axis="y", labelcolor=color_train)
     ax1.grid(True, linestyle=":", alpha=0.6)
 
@@ -105,7 +118,12 @@ def plot_training_curves(
     ax2.plot(epochs, macro_f1s, color=color_f1, marker="^", linewidth=2.5, label="Val Macro F1")
     ax2.tick_params(axis="y", labelcolor=color_f1)
 
-    plt.title("IMUSA Fine-Tuning Training Dynamics & Macro F1 Trajectory", fontsize=13, fontweight="bold", pad=12)
+    plt.title(
+        "IMUSA Fine-Tuning Training Dynamics & Macro F1 Trajectory",
+        fontsize=13,
+        fontweight="bold",
+        pad=12,
+    )
     fig.tight_layout()
 
     plt.savefig(output_path, dpi=300, bbox_inches="tight")
@@ -140,7 +158,14 @@ def plot_per_class_f1(
 
     fig, ax = plt.subplots(figsize=(8, 5))
     palette = ["#1f77b4", "#ff7f0e", "#d62728", "#2ca02c"]
-    bars = ax.bar(categories, scores, color=palette[: len(categories)], width=0.55, edgecolor="black", alpha=0.85)
+    bars = ax.bar(
+        categories,
+        scores,
+        color=palette[: len(categories)],
+        width=0.55,
+        edgecolor="black",
+        alpha=0.85,
+    )
 
     for bar in bars:
         height = bar.get_height()
@@ -158,7 +183,9 @@ def plot_per_class_f1(
     ax.set_ylim(0, 1.05)
     ax.set_ylabel("F1 Score", fontsize=11, labelpad=8)
     ax.set_xlabel("Sentiment Category", fontsize=11, labelpad=8)
-    ax.set_title("IMUSA Multimodal Model — Per-Class F1 Performance", fontsize=13, fontweight="bold", pad=12)
+    ax.set_title(
+        "IMUSA Multimodal Model — Per-Class F1 Performance", fontsize=13, fontweight="bold", pad=12
+    )
     ax.grid(axis="y", linestyle=":", alpha=0.6)
     plt.tight_layout()
 

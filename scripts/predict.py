@@ -89,7 +89,9 @@ def run_prediction_pipeline(
 
 def main() -> None:
     """Parse CLI arguments and run prediction pipeline."""
-    parser = argparse.ArgumentParser(description="IMUSA Multimodal Sentiment Test Set Prediction Script")
+    parser = argparse.ArgumentParser(
+        description="IMUSA Multimodal Sentiment Test Set Prediction Script"
+    )
     parser.add_argument(
         "--checkpoint",
         type=str,

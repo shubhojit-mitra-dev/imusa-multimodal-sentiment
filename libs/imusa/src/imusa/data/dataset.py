@@ -213,8 +213,12 @@ def create_stratified_dataloaders(
         random_state=seed,
     )
 
-    train_dataset = IMUSADataset(train_df, images_dir, tokenizer, img_transform=get_train_image_transform())
-    val_dataset = IMUSADataset(val_df, images_dir, tokenizer, img_transform=get_default_image_transform())
+    train_dataset = IMUSADataset(
+        train_df, images_dir, tokenizer, img_transform=get_train_image_transform()
+    )
+    val_dataset = IMUSADataset(
+        val_df, images_dir, tokenizer, img_transform=get_default_image_transform()
+    )
 
     train_loader = DataLoader(
         train_dataset,

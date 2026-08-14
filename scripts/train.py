@@ -107,7 +107,9 @@ def main() -> None:
 
     total_steps = epochs * len(train_loader)
     warmup_steps = int(total_steps * args.warmup_ratio)
-    scheduler = get_cosine_schedule_with_warmup(optimizer, num_warmup_steps=warmup_steps, num_training_steps=total_steps)
+    scheduler = get_cosine_schedule_with_warmup(
+        optimizer, num_warmup_steps=warmup_steps, num_training_steps=total_steps
+    )
 
     trainer = Trainer(
         model=model,

@@ -1,6 +1,5 @@
 """Unit tests for IMUSAPredictor inference module."""
 
-from pathlib import Path
 from typing import Any
 
 import torch
