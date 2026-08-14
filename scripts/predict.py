@@ -52,9 +52,13 @@ def run_prediction_pipeline(
     test_df = pd.read_csv(test_csv_path)
     logger.info("Loaded %d test samples.", len(test_df))
 
+    from transformers import AutoTokenizer
+
+    tokenizer = AutoTokenizer.from_pretrained(settings.text_model_name)
     test_dataset = IMUSADataset(
         df=test_df,
-        image_dir=settings.test_images_dir,
+        images_dir=settings.test_images_dir,
+        tokenizer=tokenizer,
         is_test=True,
     )
     test_loader = DataLoader(
