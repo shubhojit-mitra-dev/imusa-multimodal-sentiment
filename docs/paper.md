@@ -22,9 +22,9 @@ Internet memes are a dominant form of multimodal communication on social media, 
 
 ### 1.1 Background and Motivation
 
-Internet memes have evolved from simple humorous images into complex multimodal artifacts encoding cultural nuance, political commentary, sarcasm, and hate speech (Kiela et al., 2020). The sentiment conveyed by a meme frequently emerges from the *interaction* between its visual content (facial expressions, symbolic imagery, background scenes) and its embedded text — neither modality alone is sufficient for reliable classification. For example, an image of a smiling person paired with Gurmukhi text containing sarcastic wordplay inverts the surface-level positive visual sentiment into cutting irony.
+Internet memes have evolved from simple humorous images into complex multimodal artifacts encoding cultural nuance, political commentary, sarcasm, and hate speech [13]. The sentiment conveyed by a meme frequently emerges from the *interaction* between its visual content (facial expressions, symbolic imagery, background scenes) and its embedded text — neither modality alone is sufficient for reliable classification. For example, an image of a smiling person paired with Gurmukhi text containing sarcastic wordplay inverts the surface-level positive visual sentiment into cutting irony.
 
-While substantial progress has been made in multimodal meme analysis for high-resource languages like English (Sharma et al., 2020; Pramanick et al., 2021), low-resource Indic languages remain critically underserved. **Punjabi**, spoken by over 125 million people and written in the Gurmukhi script, lacks the large-scale annotated corpora and pre-trained resources available for English. The IMUSA shared task at FIRE 2026 addresses this gap by providing a curated multimodal dataset of Punjabi memes for fine-grained sentiment classification.
+While substantial progress has been made in multimodal meme analysis for high-resource languages like English [22, 19], low-resource Indic languages remain critically underserved. **Punjabi**, spoken by over 125 million people and written in the Gurmukhi script, lacks the large-scale annotated corpora and pre-trained resources available for English. The IMUSA shared task at FIRE 2026 addresses this gap by providing a curated multimodal dataset of Punjabi memes for fine-grained sentiment classification.
 
 ### 1.2 Research Problem
 
@@ -57,43 +57,43 @@ The remainder of this paper is organized as follows: §2 reviews related work ac
 
 ### 2.1 Multimodal Meme Analysis
 
-The intersection of computer vision and natural language processing for meme understanding has received growing attention. **Kiela et al. (2020)** introduced the landmark *Hateful Memes Challenge* at NeurIPS, providing 10,000+ memes with carefully constructed "benign confounders" — samples where text or image alone appears harmless but the combination conveys hate. This work demonstrated that state-of-the-art multimodal models substantially lagged behind human-level reasoning on cross-modal semantic composition.
+The intersection of computer vision and natural language processing for meme understanding has received growing attention. **Kiela et al. [13]** introduced the landmark *Hateful Memes Challenge* at NeurIPS, providing 10,000+ memes with carefully constructed "benign confounders" — samples where text or image alone appears harmless but the combination conveys hate. This work demonstrated that state-of-the-art multimodal models substantially lagged behind human-level reasoning on cross-modal semantic composition.
 
-**Sharma et al. (2020)** organized *SemEval-2020 Task 8: Memotion Analysis*, releasing 10,000 annotated memes for multi-task evaluation across sentiment polarity, humor, sarcasm, offense, and motivation — establishing foundational benchmarks for meme sentiment research. **Pranesh & Shekhar (2020)** proposed *MemeSem*, a transfer-learning framework coupling CNN visual backbones (ResNet/VGG) with transformer text encoders. **Hossain et al. (2022)** created *MemoSen*, the first South Asian (Bengali) multimodal meme sentiment dataset, demonstrating the critical necessity of language-specific encoders over English-only baselines.
+**Sharma et al. [22]** organized *SemEval-2020 Task 8: Memotion Analysis*, releasing 10,000 annotated memes for multi-task evaluation across sentiment polarity, humor, sarcasm, offense, and motivation — establishing foundational benchmarks for meme sentiment research. **Pranesh & Shekhar [20]** proposed *MemeSem*, a transfer-learning framework coupling CNN visual backbones (ResNet/VGG) with transformer text encoders. **Hossain et al. [9]** created *MemoSen*, the first South Asian (Bengali) multimodal meme sentiment dataset, demonstrating the critical necessity of language-specific encoders over English-only baselines.
 
-**Pramanick et al. (2021)** formulated the *HarMeme* benchmark for simultaneously detecting harmful memes and their target granularity, while **Suryawanshi et al. (2020)** constructed the *MultiOFF* dataset proving that combining visual features (VGG-16) with contextual text embeddings (BERT) significantly outperforms unimodal approaches for offensive meme detection.
+**Pramanick et al. [19]** formulated the *HarMeme* benchmark for simultaneously detecting harmful memes and their target granularity, while **Suryawanshi et al. [25]** constructed the *MultiOFF* dataset proving that combining visual features (VGG-16) with contextual text embeddings (BERT) significantly outperforms unimodal approaches for offensive meme detection.
 
 ### 2.2 Vision Transformers for Visual Feature Extraction
 
-**Dosovitskiy et al. (2021)** introduced the Vision Transformer (ViT), demonstrating that a pure self-attention Transformer applied directly to non-overlapping $16 \times 16$ image patches can match or exceed convolutional networks when pre-trained at scale. Follow-up work includes *DeiT* (Touvron et al., 2021), which enables efficient ViT training on ImageNet-1K without massive proprietary datasets, and *Swin Transformer* (Liu et al., 2021), introducing hierarchical windowed attention with linear computational complexity. **Radford et al. (2021)** developed *CLIP*, training joint visual-textual encoders via contrastive pre-training on 400M image-caption pairs, producing robust zero-shot cross-modal representations.
+**Dosovitskiy et al. [8]** introduced the Vision Transformer (ViT), demonstrating that a pure self-attention Transformer applied directly to non-overlapping $16 \times 16$ image patches can match or exceed convolutional networks when pre-trained at scale. Follow-up work includes *DeiT* [26], which enables efficient ViT training on ImageNet-1K without massive proprietary datasets, and *Swin Transformer* [15], introducing hierarchical windowed attention with linear computational complexity. **Radford et al. [21]** developed *CLIP*, training joint visual-textual encoders via contrastive pre-training on 400M image-caption pairs, producing robust zero-shot cross-modal representations.
 
 In our work, we adopt `google/vit-base-patch16-224` as the visual backbone, leveraging its ImageNet-21K pre-training to extract rich 768-dimensional patch-level visual features from meme images.
 
 ### 2.3 Multilingual Transformers for Indic Languages
 
-Cross-lingual representation learning is critical for low-resource languages like Punjabi. **Conneau et al. (2020)** pre-trained *XLM-RoBERTa* on 2.5TB of Common Crawl data across 100 languages (including Punjabi), demonstrating that massive-scale multilingual masked language modeling dramatically improves cross-lingual transfer. Language-specific models have further advanced Indic NLP: **Kakwani et al. (2020)** introduced *IndicBERT* supporting 11 Indian languages with the IndicGLUE benchmark; **Khanuja et al. (2021)** developed *MuRIL* (Multilingual Representations for Indian Languages) pre-trained on 17 Indian languages with transliteration augmentation; and **Doddapaneni et al. (2023)** expanded coverage to 22 languages with morphologically-informed tokenizers in *IndicBERT v2*.
+Cross-lingual representation learning is critical for low-resource languages like Punjabi. **Conneau et al. [5]** pre-trained *XLM-RoBERTa* on 2.5TB of Common Crawl data across 100 languages (including Punjabi), demonstrating that massive-scale multilingual masked language modeling dramatically improves cross-lingual transfer. Language-specific models have further advanced Indic NLP: **Kakwani et al. [10]** introduced *IndicBERT* supporting 11 Indian languages with the IndicGLUE benchmark; **Khanuja et al. [12]** developed *MuRIL* (Multilingual Representations for Indian Languages) pre-trained on 17 Indian languages with transliteration augmentation; and **Doddapaneni et al. [7]** expanded coverage to 22 languages with morphologically-informed tokenizers in *IndicBERT v2*.
 
 We select `xlm-roberta-base` for its proven Punjabi Gurmukhi script coverage and 768-dimensional contextual embeddings, with future work exploring MuRIL as a potential domain-specific alternative.
 
 ### 2.4 Multimodal Fusion Techniques
 
-Combining visual and textual representations requires principled fusion strategies. The foundational taxonomy established by **Snoek et al. (2005)** distinguishes *Early Fusion* (feature-level concatenation) from *Late Fusion* (decision-level ensemble), with intermediate fusion often capturing richer cross-modal interactions.
+Combining visual and textual representations requires principled fusion strategies. The foundational taxonomy established by **Snoek et al. [24]** distinguishes *Early Fusion* (feature-level concatenation) from *Late Fusion* (decision-level ensemble), with intermediate fusion often capturing richer cross-modal interactions.
 
-**Arevalo et al. (2017)** introduced the *Gated Multimodal Unit (GMU)*, which uses learned multiplicative sigmoid gating $\mathbf{g} = \sigma(W_g [\mathbf{h}_v ; \mathbf{h}_t])$ to adaptively control modality information flow — the direct inspiration for our fusion module. **Tsai et al. (2019)** proposed the *Multimodal Transformer (MulT)* with directional pairwise cross-modal attention, and **Lu et al. (2019)** developed *ViLBERT* with co-attentional transformer layers for bidirectional cross-modal feature exchange.
+**Arevalo et al. [1]** introduced the *Gated Multimodal Unit (GMU)*, which uses learned multiplicative sigmoid gating $\mathbf{g} = \sigma(W_g [\mathbf{h}_v ; \mathbf{h}_t])$ to adaptively control modality information flow — the direct inspiration for our fusion module. **Tsai et al. [27]** proposed the *Multimodal Transformer (MulT)* with directional pairwise cross-modal attention, and **Lu et al. [16]** developed *ViLBERT* with co-attentional transformer layers for bidirectional cross-modal feature exchange.
 
 Our architecture adopts the gated fusion approach for its interpretability and computational efficiency on small datasets, avoiding the heavy parameterization of cross-attention models that risk overfitting on 2,891 training samples.
 
 ### 2.5 Punjabi Language Processing and Indic Sentiment Analysis
 
-Punjabi NLP research remains limited compared to Hindi or Bengali. **Kaur & Gupta (2019)** developed specialized sentiment lexicons and preprocessing for Gurmukhi script, demonstrating SVM baselines for Punjabi social media sentiment. **Singh et al. (2021)** showed that morphological normalization tailored to Gurmukhi orthography substantially boosts BiLSTM/CNN sentiment classification accuracy.
+Punjabi NLP research remains limited compared to Hindi or Bengali. **Kaur & Gupta [11]** developed specialized sentiment lexicons and preprocessing for Gurmukhi script, demonstrating SVM baselines for Punjabi social media sentiment. **Singh et al. [23]** showed that morphological normalization tailored to Gurmukhi orthography substantially boosts BiLSTM/CNN sentiment classification accuracy.
 
-The **HASOC** shared task series (Mandl et al., 2020–2022) established multi-year benchmarks for hate speech detection across Indian languages, documenting the empirical superiority of multilingual transformers (XLM-R, MuRIL) over traditional ML baselines. The **DravidianLangTech** workshops (Chakravarthi et al., 2021–2023) further standardized evaluation protocols and multimodal meme datasets for Indian regional languages, cementing Macro F1 as the gold-standard shared task metric.
+The **HASOC** shared task series [17] established multi-year benchmarks for hate speech detection across Indian languages, documenting the empirical superiority of multilingual transformers (XLM-R, MuRIL) over traditional ML baselines. The **DravidianLangTech** workshops [3] further standardized evaluation protocols and multimodal meme datasets for Indian regional languages, cementing Macro F1 as the gold-standard shared task metric.
 
 ### 2.6 Class Imbalance Mitigation
 
-Severe class imbalance is a pervasive challenge in NLP and vision classification. **Chawla et al. (2002)** introduced *SMOTE* for synthetic minority oversampling via feature-space interpolation. **Lin et al. (2017)** formulated *Focal Loss*, which dynamically scales gradient contributions with a modulating factor $(1-p_t)^\gamma$ to suppress easy examples and concentrate learning on hard misclassified instances. **Mukhoti et al. (2020)** further proved that Focal Loss acts as an implicit entropy regularizer preventing overconfident predictions.
+Severe class imbalance is a pervasive challenge in NLP and vision classification. **Chawla et al. [4]** introduced *SMOTE* for synthetic minority oversampling via feature-space interpolation. **Lin et al. [14]** formulated *Focal Loss*, which dynamically scales gradient contributions with a modulating factor $(1-p_t)^\gamma$ to suppress easy examples and concentrate learning on hard misclassified instances. **Mukhoti et al. [18]** further proved that Focal Loss acts as an implicit entropy regularizer preventing overconfident predictions.
 
-**Cui et al. (2019)** proposed *Class-Balanced Loss* based on the effective number of samples $E_n = \frac{1-\beta^n}{1-\beta}$, demonstrating that sample volume exhibits diminishing returns due to data overlap. **Cao et al. (2019)** designed the *Label-Distribution-Aware Margin Loss (LDAM)* enforcing larger decision boundaries for minority classes proportional to $n_y^{-1/4}$.
+**Cui et al. [6]** proposed *Class-Balanced Loss* based on the effective number of samples $E_n = \frac{1-\beta^n}{1-\beta}$, demonstrating that sample volume exhibits diminishing returns due to data overlap. **Cao et al. [2]** designed the *Label-Distribution-Aware Margin Loss (LDAM)* enforcing larger decision boundaries for minority classes proportional to $n_y^{-1/4}$.
 
 Our approach combines inverse class-frequency weighting $\alpha_c = \frac{N}{K \cdot N_c}$ with Focal Loss ($\gamma = 2.0$), amplifying the loss contribution of the 51-sample `Offensive` class by a factor of ~14× relative to the 1,274-sample `Sarcasm` class.
 
@@ -250,7 +250,7 @@ where $\mathbf{h}_i$ is the hidden state of token $i$, $m_i \in \{0, 1\}$ is the
 
 ### 4.4 Gated Multimodal Fusion
 
-Inspired by the Gated Multimodal Unit (Arevalo et al., 2017), our fusion module dynamically balances the contribution of visual and textual features for each individual meme. Rather than assuming fixed modality importance, a learned sigmoid gate adaptively suppresses noisy or irrelevant modality signals:
+Inspired by the Gated Multimodal Unit [1], our fusion module dynamically balances the contribution of visual and textual features for each individual meme. Rather than assuming fixed modality importance, a learned sigmoid gate adaptively suppresses noisy or irrelevant modality signals:
 
 **Step 1 — Concatenation:**
 
@@ -318,7 +318,7 @@ where $W_1 \in \mathbb{R}^{512 \times 1536}$, $W_2 \in \mathbb{R}^{4 \times 512}
 
 ### 4.6 Loss Function: $\alpha$-Balanced Focal Loss
 
-To address the 25:1 class imbalance, we employ Focal Loss (Lin et al., 2017) with inverse class-frequency weighting:
+To address the 25:1 class imbalance, we employ Focal Loss [14] with inverse class-frequency weighting:
 
 $$
 \mathcal{L}_{\text{Focal}} = -\sum_{c=1}^{K} \alpha_c (1 - p_c)^\gamma y_c \log(p_c)
