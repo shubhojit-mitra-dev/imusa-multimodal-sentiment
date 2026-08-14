@@ -1,0 +1,124 @@
+"""Inference module for loading trained multimodal sentiment models and running batch predictions."""
+
+import logging
+from pathlib import Path
+from typing import Any
+
+import torch
+import torch.nn.functional as F
+from torch.utils.data import DataLoader
+
+from imusa.config import settings
+from imusa.models.multimodal import IMUSAMultimodalClassifier
+
+logger = logging.getLogger(__name__)
+
+
+class IMUSAPredictor:
+    """Predictor engine for loading model checkpoints and generating sentiment predictions."""
+
+    def __init__(
+        self,
+        checkpoint_path: str | Path | None = None,
+        model: IMUSAMultimodalClassifier | None = None,
+        device: str | None = None,
+    ) -> None:
+        """Initialize predictor from checkpoint path or pre-instantiated model instance.
+
+        Args:
+            checkpoint_path: Path to best_model.pt saved checkpoint file.
+            model: Optional pre-loaded IMUSAMultimodalClassifier instance.
+            device: Computing device ('cuda' or 'cpu'). Defaults to auto-detection.
+        """
+        if device is None:
+            self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        else:
+            self.device = device
+
+        if model is not None:
+            self.model = model
+        elif checkpoint_path is not None:
+            self.model = self._load_checkpoint(Path(checkpoint_path))
+        else:
+            logger.info("No checkpoint provided; instantiating default initialized model.")
+            self.model = IMUSAMultimodalClassifier()
+
+        self.model.to(self.device)
+        self.model.eval()
+
+    def _load_checkpoint(self, path: Path) -> IMUSAMultimodalClassifier:
+        """Load trained state dict from PyTorch checkpoint.
+
+        Args:
+            path: Path to checkpoint file (.pt).
+
+        Returns:
+            Instantiated and state-loaded IMUSAMultimodalClassifier model.
+        """
+        if not path.exists():
+            raise FileNotFoundError(f"Model checkpoint not found at path: {path}")
+
+        logger.info("Loading model checkpoint from %s...", path)
+        checkpoint = torch.load(path, map_location=self.device, weights_only=False)
+
+        model = IMUSAMultimodalClassifier()
+        if isinstance(checkpoint, dict) and "model_state_dict" in checkpoint:
+            model.load_state_dict(checkpoint["model_state_dict"])
+            logger.info(
+                "Successfully loaded checkpoint (Epoch %d, Macro F1: %.4f)",
+                checkpoint.get("epoch", -1),
+                checkpoint.get("macro_f1", 0.0),
+            )
+        elif isinstance(checkpoint, dict):
+            model.load_state_dict(checkpoint)
+        else:
+            raise ValueError(f"Invalid checkpoint format loaded from {path}")
+
+        return model
+
+    def predict_batch(self, dataloader: DataLoader[Any]) -> list[dict[str, Any]]:
+        """Generate category predictions and confidence scores for a dataset DataLoader.
+
+        Args:
+            dataloader: PyTorch DataLoader containing batch items.
+
+        Returns:
+            List of prediction dictionary records containing image_id, predicted_category,
+            confidence score, and full class probability breakdown.
+        """
+        self.model.eval()
+        results: list[dict[str, Any]] = []
+
+        with torch.no_grad():
+            for batch in dataloader:
+                images = batch["image"].to(self.device)
+                input_ids = batch["input_ids"].to(self.device)
+                attention_mask = batch.get("attention_mask")
+                if attention_mask is not None:
+                    attention_mask = attention_mask.to(self.device)
+
+                logits = self.model(images, input_ids, attention_mask)
+                probabilities = F.softmax(logits, dim=-1)
+                confidences, pred_indices = torch.max(probabilities, dim=-1)
+
+                batch_ids = batch.get("image_id", [f"sample_{i}" for i in range(len(images))])
+
+                for i in range(len(images)):
+                    pred_idx = int(pred_indices[i].item())
+                    conf_val = float(confidences[i].item())
+                    prob_dict = {
+                        category: float(probabilities[i, c_idx].item())
+                        for c_idx, category in enumerate(settings.categories)
+                    }
+
+                    results.append(
+                        {
+                            "image_id": batch_ids[i],
+                            "predicted_category": settings.categories[pred_idx],
+                            "confidence": conf_val,
+                            "probabilities": prob_dict,
+                        }
+                    )
+
+        logger.info("Generated predictions for %d test samples.", len(results))
+        return results

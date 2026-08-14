@@ -41,6 +41,29 @@ def get_default_image_transform() -> transforms.Compose:
     )
 
 
+def get_train_image_transform() -> transforms.Compose:
+    """Return training image transformation pipeline with subtle data augmentations.
+
+    Includes RandomHorizontalFlip, RandomRotation, and ColorJitter to improve model
+    generalization on imbalanced classes.
+
+    Returns:
+        torchvision.transforms.Compose pipeline.
+    """
+    return transforms.Compose(
+        [
+            transforms.Resize((224, 224)),
+            transforms.RandomHorizontalFlip(p=0.5),
+            transforms.ColorJitter(brightness=0.1, contrast=0.1),
+            transforms.ToTensor(),
+            transforms.Normalize(
+                mean=[0.485, 0.456, 0.406],
+                std=[0.229, 0.224, 0.225],
+            ),
+        ]
+    )
+
+
 class IMUSADataset(Dataset):  # type: ignore[type-arg]
     """PyTorch Dataset for Multimodal Punjabi Meme Sentiment Analysis.
 
@@ -190,8 +213,12 @@ def create_stratified_dataloaders(
         random_state=seed,
     )
 
-    train_dataset = IMUSADataset(train_df, images_dir, tokenizer)
-    val_dataset = IMUSADataset(val_df, images_dir, tokenizer)
+    train_dataset = IMUSADataset(
+        train_df, images_dir, tokenizer, img_transform=get_train_image_transform()
+    )
+    val_dataset = IMUSADataset(
+        val_df, images_dir, tokenizer, img_transform=get_default_image_transform()
+    )
 
     train_loader = DataLoader(
         train_dataset,

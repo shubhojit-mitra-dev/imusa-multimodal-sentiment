@@ -130,11 +130,47 @@ where $p_c = \text{softmax}(\mathbf{z})_c$ and $\gamma = 2.0$.
 - **Code Quality**: `ruff` (linting/formatting), `mypy` (strict static typing)
 - **Test Framework**: `pytest` (unit testing with coverage tracking)
 
+### 4.2 Training Protocol & Learning Rate Schedule
+- **Optimizer**: AdamW with weight decay $\lambda = 0.01$ and initial learning rate $\eta = 2 \times 10^{-5}$.
+- **Learning Rate Schedule**: Linear warmup for 10% of total training steps ($0.1 \cdot N_{\text{steps}}$) followed by Cosine Annealing decay:
+  $$
+  \eta(t) = \begin{cases} \eta \cdot \frac{t}{t_{\text{warmup}}} & t < t_{\text{warmup}} \\ \frac{\eta}{2} \left(1 + \cos\left(\pi \frac{t - t_{\text{warmup}}}{t_{\text{total}} - t_{\text{warmup}}}\right)\right) & \text{otherwise} \end{cases}
+  $$
+- **Data Augmentation**: Training-time visual transformations include Random Horizontal Flip ($p=0.5$), Color Jitter (brightness 0.1, contrast 0.1), and ImageNet normalization. Validation and test transforms are deterministic.
+- **Evaluation Metric**: Optimization target is **Macro F1 score** across all 4 sentiment categories:
+  $$
+  \text{Macro F1} = \frac{1}{K} \sum_{c=1}^K \text{F1}_c = \frac{1}{4} \left(\text{F1}_{\text{Sarcasm}} + \text{F1}_{\text{Motivational}} + \text{F1}_{\text{Neutral}} + \text{F1}_{\text{Offensive}}\right)
+  $$
+
 ---
 
-## 5. References & Literature Review
+## 5. Inference Engine & Test Set Prediction
+
+The production inference pipeline (`imusa.inference.IMUSAPredictor`) loads saved PyTorch model state dict checkpoints (`best_model.pt`) and performs batch evaluation on unlabeled test samples (`data/test/Test.csv`). Output predictions are mapped back to sentiment categories and formatted for competition submission:
+
+$$
+\hat{y}_i = \arg\max_{c \in \{0, 1, 2, 3\}} P(y = c \mid V_i, T_i; \Theta)
+$$
+
+---
+
+## 6. Benchmark Performance & Results Analysis
+
+*(Note: Benchmark evaluation tables will be populated upon completion of Google Colab GPU training run).*
+
+| Model Architecture | Loss Function | Val Accuracy | Val Weighted F1 | Val Macro F1 |
+|---|---|---|---|---|
+| Text-Only (XLM-RoBERTa) | Cross-Entropy | TBD | TBD | TBD |
+| Vision-Only (ViT-Base) | Cross-Entropy | TBD | TBD | TBD |
+| Multimodal (ViT + XLM-RoBERTa) | Standard Cross-Entropy | TBD | TBD | TBD |
+| **Multimodal Gated Fusion (Ours)** | **Weighted Focal Loss ($\gamma=2.0$)** | **TBD** | **TBD** | **TBD** |
+
+---
+
+## 7. References & Literature Review
 
 1. **IMUSA Shared Task @ FIRE 2026**: Indic Meme Understanding & Sentiment Analysis Guidelines.
 2. **XLM-RoBERTa**: Conneau et al. (2020), *"Unsupervised Cross-lingual Representation Learning at Scale"*.
 3. **Vision Transformer (ViT)**: Dosovitskiy et al. (2021), *"An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale"*.
 4. **Focal Loss**: Lin et al. (2017), *"Focal Loss for Dense Object Detection"*.
+
