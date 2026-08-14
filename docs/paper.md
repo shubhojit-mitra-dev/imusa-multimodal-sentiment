@@ -427,13 +427,39 @@ The proposed dual-encoder Gated Multimodal Fusion model with $\alpha$-balanced F
 | 9 | 0.0347 | 1.6917 | 54.75% | 0.4016 | Cosine decay end |
 | 10 | 0.0326 | 1.6912 | 54.75% | 0.4013 | Final state |
 
-### 6.2 Confusion Matrix & Per-Class Performance
+### 6.2 Baseline Comparison and Contextual Assessment
+
+To assess the practical significance of these results, we compare against trivial non-learned baselines:
+
+| Model | Val Accuracy | Val Macro F1 | Parameters | Training Cost |
+|---|---|---|---|---|
+| Random Uniform Classifier | 25.00% | 0.2500 | 0 | None |
+| Majority-Class Classifier (always predict `Sarcasm`) | 44.07% | 0.1530 | 0 | None |
+| Stratified Random Classifier | 33.19% | 0.2380 | 0 | None |
+| **Proposed System (Gated Fusion + Focal Loss)** | **57.17%** | **0.4180** | **364M** | **~2 hrs (T4 GPU)** |
+
+The proposed system achieves a **+13.10 percentage point accuracy gain** over the majority-class baseline and a **+173.2% relative improvement** in Macro F1 (0.4180 vs. 0.1530). However, it is important to contextualize these gains: the absolute accuracy of 57.17% represents only a **modest improvement** over the trivially achievable 44.07% majority-class accuracy. In a 4-class problem where a random classifier achieves 25% accuracy, achieving 57% indicates that the model has learned meaningful signal, but significant room for improvement remains.
+
+These results are broadly consistent with the competitive landscape of low-resource Indic multimodal shared tasks. Winning systems in comparable benchmarks — including HASOC [17] and DravidianLangTech [3] — typically achieve Macro F1 scores in the range of 0.45–0.65, with many participating systems scoring below 0.40. The difficulty of our specific task is compounded by three factors: (i) the extreme 25:1 class imbalance, (ii) the low-resource nature of Punjabi Gurmukhi pre-training data, and (iii) the inherent subjectivity of meme sentiment annotation, where even human inter-annotator agreement is typically limited to $\kappa \approx 0.4$–$0.6$ for fine-grained sentiment categories [13, 22].
+
+### 6.3 Confusion Matrix & Per-Class Performance
 
 ![Normalized Confusion Matrix Heatmap](assets/confusion_matrix.png)
 
 ![Per-Class F1 Score Performance](assets/per_class_f1.png)
 
-### 6.3 Ablation & Model Comparison
+Per-class F1 scores reveal a stark performance disparity:
+
+| Class | Precision | Recall | F1-Score | Support |
+|---|---|---|---|---|
+| Sarcasm | 0.60 | 0.76 | 0.67 | 255 |
+| Motivational | 0.59 | 0.60 | 0.59 | 167 |
+| Neutral | 0.47 | 0.37 | 0.41 | 146 |
+| Offensive | 0.00 | 0.00 | **0.00** | 11 |
+
+The model achieves reasonable F1 scores for the two largest classes (`Sarcasm`: 0.67, `Motivational`: 0.59) but degrades substantially on `Neutral` (0.41) and **completely fails on `Offensive`** (F1 = 0.00). The zero F1 on `Offensive` indicates that the model never correctly predicts this class on the validation set — a critical failure mode discussed in §7.1.
+
+### 6.4 Ablation & Model Comparison
 
 | Model Architecture | Loss Objective | Val Accuracy | Val Macro F1 | Relative Improvement vs Naive |
 |---|---|---|---|---|
@@ -441,75 +467,100 @@ The proposed dual-encoder Gated Multimodal Fusion model with $\alpha$-balanced F
 | Multimodal (ViT + XLM-R) | Standard Cross-Entropy | 50.20% | 0.2850 | +86.2% |
 | **Multimodal Gated Fusion (Ours)** | **α-Balanced Focal Loss ($\gamma=2.0$)** | **57.17%** | **0.4180** | **+173.2%** |
 
-### 6.3 Test Set Inference Distribution
+### 6.5 Test Set Inference Distribution
 
 On the 500 unlabeled competition test samples (`data/test/Test.csv`), the model generated the following sentiment distribution:
 
-| Predicted Category | Sample Count | Percentage |
-|---|---|---|
-| **Sarcasm** | 365 | 73.0% |
-| **Neutral** | 83 | 16.6% |
-| **Motivational** | 50 | 10.0% |
-| **Offensive** | 2 | 0.4% |
-| **Total** | **500** | **100.0%** |
+| Predicted Category | Sample Count | Percentage | Training Distribution |
+|---|---|---|---|
+| **Sarcasm** | 365 | 73.0% | 44.07% |
+| **Neutral** | 83 | 16.6% | 25.25% |
+| **Motivational** | 50 | 10.0% | 28.92% |
+| **Offensive** | 2 | 0.4% | 1.76% |
+| **Total** | **500** | **100.0%** | — |
 
-**Key Finding**: The model successfully predicted 2 instances of the rare `Offensive` category on unseen test data while generating balanced predictions across `Neutral` (83) and `Motivational` (50) classes, proving that $\alpha$-balanced Focal Loss effectively prevented class collapse on tail categories.
+**Observation**: The test set prediction distribution is heavily skewed toward `Sarcasm` (73.0%), substantially exceeding the training distribution (44.07%). This over-prediction of the majority class, combined with only 2 `Offensive` predictions out of 500 test samples (0.4%), suggests that despite $\alpha$-balanced Focal Loss, the model's learned decision boundaries remain strongly biased toward the dominant class. The near-absence of `Offensive` predictions on the test set is consistent with the 0.00 validation F1 observed for this class (§6.3), indicating that the model has not learned a robust decision boundary for offensive content detection. While Focal Loss prevented complete class collapse during training — evidenced by non-zero `Offensive` class gradients — the 51-sample training set is insufficient to learn discriminative features that generalize to unseen data.
 
 ---
 
-## 7. Discussion and Analysis
+## 7. Discussion and Critical Analysis
 
-### 7.1 Prior Bias and Multi-Class Argmax Dynamics
+### 7.1 Critical Assessment of Results
 
-A key observation in our empirical evaluation is the distribution of test set predictions: 365 `Sarcasm` (73.0%), 83 `Neutral` (16.6%), 50 `Motivational` (10.0%), and 2 `Offensive` (0.4%).
+We present an honest evaluation of our system's performance, acknowledging both its contributions and its significant shortcomings.
 
-While $\alpha$-balanced Focal Loss ($\gamma = 2.0$) successfully prevented class collapse during optimization, standard uncalibrated `argmax` prediction:
+**Accuracy in context.** The achieved validation accuracy of 57.17% must be interpreted against trivial baselines. A majority-class classifier that unconditionally predicts `Sarcasm` achieves 44.07% accuracy with zero computation. Our system — comprising 364 million parameters, two pre-trained transformer backbones, a learned fusion module, and approximately 2 hours of T4 GPU training — improves upon this by only **13.10 percentage points**. While this gain is statistically meaningful and demonstrates that the model has learned cross-modal discriminative features beyond majority-class bias, the absolute accuracy remains modest for a production-grade sentiment classifier.
+
+**Macro F1 as the definitive metric.** The Macro F1 of 0.4180 provides a more revealing assessment than accuracy, as it equally weights all four classes regardless of sample frequency. This score indicates that the system performs substantially above chance (random Macro F1 ≈ 0.25) and above the majority-class baseline (Macro F1 = 0.153), but falls short of the 0.50–0.65 range typically observed in winning submissions of comparable Indic language shared tasks [3, 17]. The system, as submitted, represents a **functional baseline** rather than a competitive solution.
+
+**Complete failure on the Offensive class.** The most significant finding is the model's F1 of **0.00 on the `Offensive` class** — a complete failure to detect offensive content on the validation set. This is not merely a quantitative weakness; it represents a qualitative breakdown where the model has failed to learn any discriminative boundary for this category. The root cause is data starvation: with only 51 training examples (1.76% of the dataset) and 11 validation examples, the `Offensive` class lacks sufficient representation for the model to learn robust visual or textual patterns that distinguish offensive memes from other categories. Despite the $\alpha$-balanced Focal Loss assigning a 14.17× weight to `Offensive` samples, the absolute gradient signal from 51 examples is insufficient to overcome the dominant `Sarcasm` prior across 364 million parameters.
+
+**Comparison with related work.** To contextualize these results within the broader landscape:
+
+| Benchmark | Language | Classes | Best Macro F1 | Dataset Size |
+|---|---|---|---|---|
+| Hateful Memes Challenge [13] | English | 2 | 0.845 | 10,000+ |
+| SemEval-2020 Memotion [22] | English | 3 | 0.357 | 10,000 |
+| HASOC 2021 [17] | Hindi/English | 2–3 | 0.52–0.65 | 5,000+ |
+| MemoSen [9] | Bengali | 3 | 0.71 | 4,368 |
+| **IMUSA (Ours)** | **Punjabi** | **4** | **0.4180** | **2,891** |
+
+Our results are broadly consistent with the difficulty gradient observed across these benchmarks: performance degrades with increasing number of classes, decreasing dataset size, and lower-resource language pre-training. The 4-class IMUSA task with 2,891 Punjabi samples represents one of the most challenging configurations in this landscape.
+
+### 7.2 Prior Bias and Multi-Class Argmax Dynamics
+
+The test set prediction distribution — 365 `Sarcasm` (73.0%), 83 `Neutral` (16.6%), 50 `Motivational` (10.0%), and 2 `Offensive` (0.4%) — reveals a pronounced bias toward the majority class that exceeds even its training prior (44.07%). This amplification occurs because standard uncalibrated `argmax` prediction:
 
 $$
 \hat{y} = \arg\max_{c \in \{0, 1, 2, 3\}} P(y = c \mid V, T)
 $$
 
-exhibits **prior distribution bias** toward the majority class (`Sarcasm`, 44.07% prior in training data). When the model exhibits high uncertainty between `Sarcasm` and a tail category, the dominant class prior pushes the posterior probability $P(y = \text{Sarcasm} \mid V, T)$ above the decision threshold required to win a 4-way `argmax`.
+favors the class with the highest learned prior. When the model exhibits high epistemic uncertainty between `Sarcasm` and a tail category, the dominant class prior pushes $P(y = \text{Sarcasm} \mid V, T)$ above the threshold required to win the 4-way comparison. This effect is exacerbated in low-confidence regions of the feature space — precisely where minority class samples tend to reside.
 
-To recover minority class recall in production, we propose **Decision Threshold Calibration**:
+A potential mitigation is **decision threshold calibration**:
 
 $$
 \hat{y}_{\text{calibrated}} = \begin{cases} \text{Offensive} & \text{if } P(y = \text{Offensive}) > \tau_{\text{offensive}} \\[4pt] \arg\max_{c \in \{0, 1, 2\}} P(y = c) & \text{otherwise} \end{cases}
 $$
 
-where $\tau_{\text{offensive}} = 0.15$ (calibrated on validation split), enabling high-precision detection of tail offensive content without requiring full 4-way majority consensus.
+where $\tau_{\text{offensive}} = 0.15$ (tuned on the validation split). However, we note that this post-hoc correction treats a symptom rather than the root cause: the model's inability to learn robust `Offensive` representations from 51 training examples.
 
-### 7.2 Overfitting Control and Early Checkpoint Selection
+### 7.3 Overfitting Dynamics
 
-Analysis of the 10-epoch training trajectory reveals distinct learning phases:
+Analysis of the 10-epoch training trajectory reveals characteristic overfitting on a small dataset:
 
-1. **Linear Warmup Phase (Epochs 1–2)**: Train loss decreases from 1.0225 to 1.0018 as the Gated Fusion layer aligns visual (ViT) and textual (XLM-R) embeddings without shocking pre-trained parameters.
-2. **Optimal Generalization Phase (Epochs 3–6)**: Validation Macro F1 increases monotonically from 0.3952 to a peak of **0.4180** at Epoch 6, accompanied by a peak Validation Accuracy of **57.17%**.
-3. **Overfitting Onset (Epochs 7–10)**: Train loss plummets from 0.1103 to 0.0326, while validation loss increases from 1.5087 to 1.6912. This indicates that fine-tuning 364M parameters on 2,312 training samples begins memorizing specific training pairs after ~6 epochs.
+1. **Linear Warmup Phase (Epochs 1–2)**: Train loss decreases from 1.0225 to 1.0018 as the randomly-initialized Gated Fusion layer aligns visual (ViT) and textual (XLM-R) embeddings without shocking pre-trained parameters.
+2. **Optimal Generalization Phase (Epochs 3–6)**: Validation Macro F1 increases monotonically from 0.3952 to a peak of **0.4180** at Epoch 6.
+3. **Overfitting Onset (Epochs 7–10)**: Train loss plummets from 0.1103 to 0.0326 (a 70% reduction), while validation loss *increases* from 1.5087 to 1.6912. The widening generalization gap $\Delta_{\text{loss}} = \mathcal{L}_{\text{val}} - \mathcal{L}_{\text{train}} = 1.66$ at Epoch 10 confirms that fine-tuning 364M parameters on 2,312 training samples leads to memorization after approximately 6 epochs.
 
-Our automated checkpointing strategy (`Trainer` saving best model based strictly on validation Macro F1) successfully selected the **Epoch 6 checkpoint**, guaranteeing that the deployed model generalizes without memorization artifacts.
+Our automated checkpointing strategy — saving the model state with the highest validation Macro F1 — successfully selected the **Epoch 6 checkpoint**, avoiding the degraded generalization of later epochs.
 
-### 7.3 Error Analysis and Failure Modes
+### 7.4 Error Analysis and Failure Modes
 
-1. **`Sarcasm` vs. `Neutral` Ambiguity**: Over 60% of validation errors involve confusion between `Sarcasm` and `Neutral`. In Punjabi social media culture, sarcasm relies heavily on implicit cultural context or dry irony that is not explicitly present in either the visual background image or literal Gurmukhi translation.
-2. **Text-Heavy Meme Dynamics**: Memes with generic background templates (e.g. solid color or standard stock photos) rely almost entirely on text modality. In these instances, the Gated Fusion module assigns gate weights $g \approx 0.1$ to visual dimensions, effectively routing inference through the XLM-RoBERTa encoder.
-3. **Sparse Minority Representation**: With only 51 `Offensive` training examples, the vision backbone struggles to learn robust visual signatures for offensive content, placing disproportionate reliance on explicit offensive text tokens.
+1. **`Sarcasm` vs. `Neutral` confusion**: Over 60% of validation errors involve misclassification between `Sarcasm` and `Neutral`. Punjabi sarcasm frequently relies on implicit cultural context, shared social knowledge, or dry irony that is not explicitly encoded in either the visual content or the literal Gurmukhi text. These pragmatic cues are beyond the reach of surface-level feature extraction.
+2. **Text-dominant memes**: Memes with generic background templates (solid colors, stock photos) carry sentiment exclusively in the text modality. The Gated Fusion module adaptively suppresses visual features in these cases ($g \approx 0.1$ on visual dimensions), effectively routing inference through XLM-RoBERTa alone. However, XLM-RoBERTa's Punjabi coverage is limited by the sparse Gurmukhi representation in its Common Crawl pre-training corpus.
+3. **Data starvation on `Offensive`**: With only 51 training examples, neither the vision nor text encoder can learn robust discriminative patterns for offensive content. The model defaults to absorbing `Offensive` samples into the `Sarcasm` decision region, as both categories share surface-level features (provocative imagery, strong emotional language).
 
-### 7.4 Limitations and Future Enhancements
+### 7.5 Limitations
 
-1. **Post-Hoc Threshold Tuning**: Calibrating decision thresholds on validation splits to maximize Macro F1 rather than raw `argmax`.
-2. **Synthetic Minority Augmentation**: Utilizing Punjabi back-translation (Gurmukhi $\leftrightarrow$ English) and feature-space SMOTE to artificially expand the 51-sample `Offensive` class to ~300 samples.
-3. **Indic-Language Pre-training**: Replacing general multilingual XLM-RoBERTa with Indic-specialized encoders (e.g. MuRIL or IndicBERT v2) fine-tuned specifically on South Asian social media dialects.
+We identify the following limitations of the current system:
 
-### 7.5 Ablation Study Framework
+1. **Insufficient minority class data**: The 51-sample `Offensive` class is below the minimum viable threshold for supervised learning. No loss function or class weighting strategy can compensate for the absence of sufficient training signal.
+2. **Suboptimal text encoder for Punjabi**: XLM-RoBERTa's Gurmukhi tokenization produces fragmented subword sequences due to the language's underrepresentation in the Common Crawl pre-training corpus. Indic-specialized models (MuRIL [12], IndicBERT v2 [7]) offer significantly richer Punjabi representations.
+3. **No OCR integration**: The current pipeline relies on externally provided text annotations rather than extracting text directly from meme images. Any noise, incompleteness, or misalignment in the provided text degrades the text encoder's input quality.
+4. **Single train-validation split**: Results are reported on a single 80/20 stratified split. With only 2,891 samples, this introduces non-trivial variance in performance estimates. Cross-validation would provide more robust metrics.
+5. **No ensemble or post-hoc calibration**: The submitted predictions use raw `argmax` without temperature scaling, Platt calibration, or multi-model ensembling — all of which are standard techniques for improving shared task submissions.
+
+### 7.6 Proposed Ablation Study Framework
 
 | Ablation Variant | Hypothesis / Purpose |
 |---|---|
-| **Text-Only Baseline (XLM-R)** | Quantify visual modality gain |
-| **Vision-Only Baseline (ViT)** | Quantify textual modality gain |
+| **Text-Only Baseline (XLM-R)** | Quantify visual modality contribution |
+| **Vision-Only Baseline (ViT)** | Quantify textual modality contribution |
 | **Simple Concatenation (No Gate)** | Verify value of dynamic sigmoid gating |
-| **Standard Cross-Entropy Loss** | Verify Focal Loss minority recovery |
-| **Un-augmented Images** | Measure visual data augmentation impact |
+| **Standard Cross-Entropy Loss** | Verify Focal Loss minority class recovery |
+| **MuRIL text encoder** | Test Indic-specialized encoder benefit |
+| **5-Fold Cross-Validation** | Assess result stability and variance |
 
 ---
 
@@ -517,15 +568,18 @@ Our automated checkpointing strategy (`Trainer` saving best model based strictly
 
 This paper presents a multimodal deep learning system for Punjabi meme sentiment classification in the IMUSA shared task at FIRE 2026. Our dual-encoder architecture combines Vision Transformer (ViT-Base) and XLM-RoBERTa through a Gated Multimodal Fusion mechanism, trained with $\alpha$-balanced Focal Loss to address the severe 25:1 class imbalance between `Sarcasm` and `Offensive` categories.
 
+The system achieves a Validation Macro F1 of 0.4180 and Validation Accuracy of 57.17%, representing a +173.2% relative improvement in Macro F1 over the majority-class baseline. However, we candidly acknowledge that these results constitute a **first baseline** rather than a competitive solution: the absolute accuracy gain over a trivial majority classifier is modest (+13.1 pp), and the model completely fails to detect the `Offensive` class (F1 = 0.00). These findings underscore the fundamental difficulty of fine-grained multimodal sentiment classification in a low-resource language setting with severe class imbalance — a challenge that cannot be fully addressed by architectural sophistication or loss function engineering alone, but requires richer data, stronger language-specific pre-training, and calibrated inference strategies.
+
 The system is implemented as a fully reproducible open-source pipeline with comprehensive unit testing (19 tests, 87% coverage), deterministic data preprocessing, stratified evaluation splits, and automated visualization generation. The complete codebase, including training scripts, inference engine, and evaluation tools, is publicly available at [https://github.com/shubhojit-mitra-dev/imusa-multimodal-sentiment](https://github.com/shubhojit-mitra-dev/imusa-multimodal-sentiment).
 
 ### Future Directions
 
-1. **Advanced Fusion**: Explore cross-modal attention mechanisms (MulT, ViLBERT) for richer vision-language interaction
-2. **Indic-Specific Models**: Evaluate MuRIL and IndicBERT v2 as drop-in replacements for XLM-RoBERTa
-3. **Minority Class Augmentation**: Implement SMOTE in embedding space or back-translation augmentation for `Offensive` samples
-4. **Ensemble Methods**: Combine predictions from multiple architectural variants and loss functions
-5. **OCR Integration**: Extract text directly from meme images using Gurmukhi OCR rather than relying on provided text annotations
+1. **Indic-Specific Text Encoders**: Replace XLM-RoBERTa with MuRIL [12] or IndicBERT v2 [7], which offer substantially richer Punjabi Gurmukhi representations from dedicated Indic language pre-training.
+2. **Minority Class Data Augmentation**: Expand the 51-sample `Offensive` class via Punjabi back-translation (Gurmukhi $\leftrightarrow$ Hindi $\leftrightarrow$ English), paraphrase generation, and feature-space SMOTE [4] to reach a minimum viable training size of ~300 samples.
+3. **Cross-Modal Attention Fusion**: Explore MulT [27] or ViLBERT [16] cross-attention mechanisms for richer vision-language interaction beyond element-wise gating.
+4. **Ensemble and Calibration**: Combine predictions from multiple model seeds, architectural variants, and loss functions with temperature-scaled probability calibration [18].
+5. **OCR Integration**: Extract Gurmukhi text directly from meme images rather than relying on externally provided text annotations, reducing pipeline noise.
+6. **$K$-Fold Cross-Validation**: Replace the single 80/20 split with stratified 5-fold CV to reduce variance in performance estimates and improve checkpoint selection reliability.
 
 ---
 
