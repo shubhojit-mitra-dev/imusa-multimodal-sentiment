@@ -412,6 +412,8 @@ $$
 
 The proposed dual-encoder Gated Multimodal Fusion model with $\alpha$-balanced Focal Loss ($\gamma = 2.0$) was fine-tuned for 10 epochs on an NVIDIA T4 GPU (Google Colab). The system achieved a **peak Validation Macro F1 of 0.4180** and **Validation Accuracy of 57.17%** at Epoch 6.
 
+![Training Loss and Validation Macro F1 Trajectory](assets/training_curves.png)
+
 | Epoch | Train Loss | Val Loss | Val Accuracy | Val Macro F1 | Status |
 |---|---|---|---|---|---|
 | 1 | 1.0225 | 1.2127 | 50.43% | 0.2879 | Baseline |
@@ -425,7 +427,13 @@ The proposed dual-encoder Gated Multimodal Fusion model with $\alpha$-balanced F
 | 9 | 0.0347 | 1.6917 | 54.75% | 0.4016 | Cosine decay end |
 | 10 | 0.0326 | 1.6912 | 54.75% | 0.4013 | Final state |
 
-### 6.2 Ablation & Model Comparison
+### 6.2 Confusion Matrix & Per-Class Performance
+
+![Normalized Confusion Matrix Heatmap](assets/confusion_matrix.png)
+
+![Per-Class F1 Score Performance](assets/per_class_f1.png)
+
+### 6.3 Ablation & Model Comparison
 
 | Model Architecture | Loss Objective | Val Accuracy | Val Macro F1 | Relative Improvement vs Naive |
 |---|---|---|---|---|
