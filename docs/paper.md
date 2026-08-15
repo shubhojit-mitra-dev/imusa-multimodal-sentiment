@@ -332,7 +332,9 @@ $$
 
 with smoothing factor $\epsilon = 0.05$. This prevents the cross-entropy objective from driving logit magnitudes to infinity, regularizing the model against over-fitting on noisy subword tokens.
 
-### 4.7 Advanced Training Strategies for V2 Evolution
+### 4.7 Proposed V2 Training Strategies (Pending Experimental Validation)
+
+> **⚠️ Status Note**: The following techniques (§4.7.1–§4.7.4) have been **implemented in code** (`scripts/train_kfold.py`, `libs/imusa/src/imusa/evaluation/calibration.py`, `libs/imusa/src/imusa/data/augmentation.py`) but have **not yet been executed on GPU hardware**. No empirical V2 results exist at the time of writing. The V2 experimental validation is the immediate next step in this research. All performance claims in §6 refer exclusively to the V1 baseline system.
 
 #### 4.7.1 Linear Probing before Fine-Tuning (LP-FT)
 
@@ -387,9 +389,9 @@ To overcome single-session Google Colab runtime GPU quotas (T4/V100 GPU timeouts
 - **Account 2 (`notebooks/03_v2_fold_2_3_training.ipynb`)**: Executes Stratified Folds 2 and 3.
 - **Account 3 (`notebooks/04_v2_fold_4_ensemble.ipynb`)**: Executes Stratified Fold 4, aggregates Out-of-Fold (OOF) probability matrices $\mathbf{P}_{\text{OOF}}$, performs Nelder-Mead threshold calibration, and computes the 5-fold probability ensemble predictions.
 
-This parallelization reduces total wall-clock training time by $60\%$ (from $\sim 2.5$ hours down to $\sim 1.0$ hour) while keeping each individual fold session well within standard free-tier Colab GPU limits.
+This parallelization is designed to reduce total wall-clock training time by an estimated $60\%$ (from $\sim 2.5$ hours down to $\sim 1.0$ hour) while keeping each individual fold session well within standard free-tier Colab GPU limits.
 
-To eliminate single-split variance and maximize dataset utilization on 2,891 samples, we implement **Stratified $5$-Fold Cross-Validation** ($K = 5$):
+To eliminate single-split variance and maximize dataset utilization on 2,891 samples, we propose **Stratified $5$-Fold Cross-Validation** ($K = 5$):
 
 $$
 \mathcal{D} = \bigcup_{k=1}^{K} \mathcal{D}_k, \quad \mathcal{D}_i \cap \mathcal{D}_j = \emptyset \quad \forall i \neq j
@@ -397,7 +399,7 @@ $$
 
 Each fold maintains identical class proportions across training ($\frac{K-1}{K} \cdot |\mathcal{D}| \approx 2,312$ samples) and validation ($\frac{1}{K} \cdot |\mathcal{D}| \approx 579$ samples) partitions.
 
-### 5.4 Post-Hoc Threshold Calibration via Nelder-Mead Optimization
+### 4.8 Post-Hoc Threshold Calibration via Nelder-Mead Optimization
 
 Standard multi-class decision rules select category labels via uncalibrated `argmax` over raw output probabilities:
 
@@ -432,9 +434,13 @@ graph TD
     end
 ```
 
-The optimized threshold vector $\boldsymbol{\tau}^*$ is persisted to `outputs/v2/calibration/thresholds.json` and loaded during test set inference to produce calibrated ensemble predictions.
+The optimized threshold vector $\boldsymbol{\tau}^*$ will be persisted to `outputs/v2/calibration/thresholds.json` and loaded during test set inference to produce calibrated ensemble predictions.
 
-The training CLI configuration is invoked as follows:
+---
+
+## 5. Experimental Setup (V1 Baseline)
+
+The V1 baseline system (ViT-Base + XLM-RoBERTa, single 80/20 split, $\alpha$-Balanced Focal Loss) was trained on Google Colab with an NVIDIA T4 GPU. The training CLI configuration is invoked as follows:
 
 ```bash
 uv run python scripts/train.py --epochs 10 --batch-size 16 --lr 2e-5 --loss focal --warmup-ratio 0.1
@@ -453,7 +459,7 @@ The design rationale for each chosen hyperparameter is justified as follows:
 5. **Loss Objective ($\text{Loss} = \text{Focal}$, $\gamma = 2.0$)**:
    - *Rationale*: Assigns an inverse class-frequency weight $\alpha_{\text{Offensive}} = 14.17$ versus $\alpha_{\text{Sarcasm}} = 0.567$, forcing the model gradient to prioritize minority class detection.
 
-### 5.3 Learning Rate Schedule
+### 5.2 Learning Rate Schedule
 
 The learning rate follows a linear warmup phase for the first 10% of total training steps, followed by cosine annealing decay:
 
@@ -536,76 +542,97 @@ On the 500 unlabeled competition test samples (`data/test/Test.csv`), the model 
 | **Offensive** | 2 | 0.4% | 1.76% |
 | **Total** | **500** | **100.0%** | — |
 
-**Observation**: The test set prediction distribution is heavily skewed toward `Sarcasm` (73.0%), substantially exceeding the training distribution (44.07%). This over-prediction of the majority class, combined with only 2 `Offensive` predictions out of 500 test samples (0.4%), suggests that despite $\alpha$-balanced Focal Loss, the model's learned decision boundaries remain strongly biased toward the dominant class. The near-absence of `Offensive` predictions on the test set is consistent with the 0.00 validation F1 observed for this class (§6.3), indicating that the model has not learned a robust decision boundary for offensive content detection. While Focal Loss prevented complete class collapse during training — evidenced by non-zero `Offensive` class gradients — the 51-sample training set is insufficient to learn discriminative features that generalize to unseen data.
-
----
+**Observation**: The test set prediction distribution is heavily skewed toward `Sarcasm` (73.0%), substantially exceeding the training distribution (44.07%). This o---
 
 ## 7. Discussion and Critical Analysis
 
-### 7.1 Critical Assessment of Results
+### 7.1 Critical Assessment of V1 Baseline Results
 
-We present an honest evaluation of our system's performance, acknowledging both its contributions and its significant shortcomings.
+We present an honest evaluation of our V1 system's performance, acknowledging both its contributions and its significant shortcomings.
 
 **Accuracy in context.** The achieved validation accuracy of 57.17% must be interpreted against trivial baselines. A majority-class classifier that unconditionally predicts `Sarcasm` achieves 44.07% accuracy with zero computation. Our system — comprising 364 million parameters, two pre-trained transformer backbones, a learned fusion module, and approximately 2 hours of T4 GPU training — improves upon this by only **13.10 percentage points**. While this gain is statistically meaningful and demonstrates that the model has learned cross-modal discriminative features beyond majority-class bias, the absolute accuracy remains modest for a production-grade sentiment classifier.
 
+**Macro F1 as the definitive metric.** The Macro F1 of 0.4180 provides a more revealing assessment than accuracy, as it equally weights all four classes regardless of sample frequency. This score indicates that the system performs substantially above chance (random Macro F1 ≈ 0.25) and above the majority-class baseline (Macro F1 = 0.153), but falls short of the 0.50–0.65 range typically observed in winning submissions of comparable Indic language shared tasks [3, 17]. The V1 system, as submitted, represents a **functional baseline** rather than a competitive solution.
+
+**Complete failure on the Offensive class.** The most significant finding is the model's F1 of **0.00 on the `Offensive` class** — a complete failure to detect offensive content on the validation set. This is not merely a quantitative weakness; it represents a qualitative breakdown where the model has failed to learn any discriminative boundary for this category. The root cause is data starvation: with only 51 training examples (1.76% of the dataset) and 11 validation examples, the `Offensive` class lacks sufficient representation for the model to learn robust visual or textual patterns. Despite the $\alpha$-balanced Focal Loss assigning a 14.17× weight to `Offensive` samples, the absolute gradient signal from 51 examples is insufficient to overcome the dominant `Sarcasm` prior across 364 million parameters.
+
+**Comparison with related work.** To contextualize these results within the broader landscape:
+
+| Benchmark | Language | Classes | Best Macro F1 | Dataset Size |
+|---|---|---|---|---|
+| Hateful Memes Challenge [13] | English | 2 | 0.845 | 10,000+ |
+| SemEval-2020 Memotion [22] | English | 3 | 0.357 | 10,000 |
+| HASOC 2021 [17] | Hindi/English | 2–3 | 0.52–0.65 | 5,000+ |
+| MemoSen [9] | Bengali | 3 | 0.71 | 4,368 |
+| **IMUSA V1 (Ours)** | **Punjabi** | **4** | **0.4180** | **2,891** |
+
+Our results are broadly consistent with the difficulty gradient observed across these benchmarks: performance degrades with increasing number of classes, decreasing dataset size, and lower-resource language pre-training.
+
+### 7.2 Prior Bias and Multi-Class Argmax Dynamics
+
+The test set prediction distribution — 365 `Sarcasm` (73.0%), 83 `Neutral` (16.6%), 50 `Motivational` (10.0%), and 2 `Offensive` (0.4%) — reveals a pronounced bias toward the majority class that exceeds even its training prior (44.07%). This amplification occurs because standard uncalibrated `argmax` prediction favors the class with the highest learned prior. When the model exhibits high epistemic uncertainty between `Sarcasm` and a tail category, the dominant class prior pushes $P(y = \text{Sarcasm} \mid V, T)$ above the threshold required to win the 4-way comparison. This is one of the primary motivations for the proposed Nelder-Mead Post-Hoc Threshold Calibration described in §4.8.
+
+### 7.3 Overfitting Dynamics
+
+Analysis of the 10-epoch training trajectory reveals characteristic overfitting on a small dataset:
+
+1. **Linear Warmup Phase (Epochs 1–2)**: Train loss decreases from 1.0225 to 1.0018 as the randomly-initialized Gated Fusion layer aligns visual (ViT) and textual (XLM-R) embeddings.
+2. **Optimal Generalization Phase (Epochs 3–6)**: Validation Macro F1 increases monotonically from 0.3952 to a peak of **0.4180** at Epoch 6.
+3. **Overfitting Onset (Epochs 7–10)**: Train loss plummets from 0.1103 to 0.0326 (a 70% reduction), while validation loss *increases* from 1.5087 to 1.6912. The widening generalization gap confirms that fine-tuning 364M parameters on 2,312 training samples leads to memorization after approximately 6 epochs.
+
+Our automated checkpointing strategy — saving the model state with the highest validation Macro F1 — successfully selected the **Epoch 6 checkpoint**.
+
+### 7.4 Error Analysis and Failure Modes
+
+1. **`Sarcasm` vs. `Neutral` confusion**: Over 60% of validation errors involve misclassification between `Sarcasm` and `Neutral`. Punjabi sarcasm frequently relies on implicit cultural context and dry irony not explicitly encoded in either modality.
+2. **Text-dominant memes**: Memes with generic background templates carry sentiment exclusively in text. The Gated Fusion module adaptively suppresses visual features in these cases, but XLM-RoBERTa's Punjabi coverage is limited by sparse Gurmukhi representation in its Common Crawl pre-training corpus.
+3. **Data starvation on `Offensive`**: With only 51 training examples, neither encoder can learn robust discriminative patterns for offensive content. The model defaults to absorbing `Offensive` samples into the `Sarcasm` decision region.
+
+### 7.5 Limitations and Motivation for V2
+
+We identify the following limitations of the V1 system, which directly motivate the V2 improvements proposed in §4.7–§4.8:
+
+| V1 Limitation | Proposed V2 Mitigation | Status |
+|---|---|---|
+| Suboptimal Punjabi tokenization (XLM-R) | MuRIL text encoder (§4.7.1) | Code implemented, not yet validated |
+| Feature corruption on small dataset | LP-FT two-stage protocol (§4.7.1) | Code implemented, not yet validated |
+| Overconfident decision boundaries | Manifold Mixup + Label Smoothing (§4.7.2, §4.6) | Code implemented, not yet validated |
+| Single train-val split variance | Stratified 5-Fold CV (§4.7.4) | Code implemented, not yet validated |
+| Raw argmax suppresses minority classes | Nelder-Mead Threshold Calibration (§4.8) | Code implemented, not yet validated |
+| Limited training augmentation | Vision + Text EDA pipeline (§4.7.3) | Code implemented, not yet validated |
+
 ---
 
-## 6. Empirical Results and Systematic Ablation
+## 8. Conclusion and Current Status
 
-### 6.1 Performance Evolution: V1 Baseline vs. V2 System
+### 8.1 V1 Baseline Results (Verified)
 
-| System Version | Text Encoder | Vision Encoder | Training Protocol | Loss Function | Split / Validation | Macro F1 | Offensive F1 |
-|---|---|---|---|---|---|---|---|
-| **V1 Baseline** | XLM-RoBERTa | ViT-Base | End-to-End Fine-Tuning | $\alpha$-Focal Loss | Single 80/20 Split | **0.4180** | **0.0000** |
-| **V2 Evolutionary System** | **MuRIL-Base** | ViT-Base | **LP-FT (2-Stage)** | **Label-Smoothed Focal** | **5-Fold CV Ensemble** | **0.65+** | **0.42+** |
+This paper presents a multimodal deep learning system for Punjabi meme sentiment classification in the IMUSA shared task at FIRE 2026. Our V1 dual-encoder architecture combines Vision Transformer (ViT-Base) and XLM-RoBERTa through a Gated Multimodal Fusion mechanism, trained with $\alpha$-balanced Focal Loss to address the severe 25:1 class imbalance.
 
-### 6.2 Component-Wise Ablation Analysis
+The V1 system achieves a **Validation Macro F1 of 0.4180** and **Validation Accuracy of 57.17%**, representing a +173.2% relative improvement in Macro F1 over the majority-class baseline. However, these results constitute a **first baseline** rather than a competitive solution: the model completely fails to detect the `Offensive` class (F1 = 0.00), and the absolute accuracy gain over a trivial majority classifier is modest (+13.1 pp).
 
-To isolate the contributions of each introduced technique in the V2 evolution, we report step-by-step ablation gains across Out-of-Fold validation metrics:
+### 8.2 V2 System (Implemented, Pending Experimental Validation)
 
-| System Variant | Val Macro F1 | Sarcasm F1 | Neutral F1 | Motivational F1 | Offensive F1 | Relative Gain |
-|---|---|---|---|---|---|---|
-| (1) V1 Baseline (ViT + XLM-R, Single Split) | 0.4180 | 0.6970 | 0.5510 | 0.4240 | 0.0000 | Baseline |
-| (2) + MuRIL Punjabi Text Encoder | 0.4820 | 0.7210 | 0.6050 | 0.4910 | 0.1110 | +15.3% |
-| (3) + Linear Probing before Fine-Tuning (LP-FT) | 0.5240 | 0.7450 | 0.6320 | 0.5280 | 0.1910 | +25.4% |
-| (4) + Label-Smoothed Focal Loss ($\epsilon=0.05$) | 0.5590 | 0.7580 | 0.6510 | 0.5620 | 0.2650 | +33.7% |
-| (5) + Manifold Mixup ($\alpha_{\text{mix}}=0.2$) | 0.5870 | 0.7720 | 0.6740 | 0.5910 | 0.3110 | +40.4% |
-| (6) + Stratified 5-Fold CV Ensemble | 0.6210 | 0.7910 | 0.7020 | 0.6250 | 0.3660 | +48.6% |
-| (7) **Full V2 System (+ Nelder-Mead Calibration)** | **0.65+** | **0.8100** | **0.7250** | **0.6550** | **0.42+** | **+55.5%** |
+Motivated by the V1 limitations documented in §7.5, we have designed and implemented a comprehensive V2 system incorporating six principled improvements:
 
----
+1. **MuRIL Punjabi Text Encoder** — replacing generic XLM-RoBERTa with Indic-specialized representations.
+2. **Two-Stage LP-FT Protocol** — preventing pre-trained feature corruption on our small dataset.
+3. **Label-Smoothed Focal Loss & Manifold Mixup** — regularizing minority class decision boundaries.
+4. **Multimodal Data Augmentation** — vision transforms and text EDA to expand effective training size.
+5. **Stratified 5-Fold Cross-Validation Ensemble** — eliminating single-split variance.
+6. **Nelder-Mead Post-Hoc Threshold Calibration** — counteracting majority class prior bias.
 
-## 7. Discussion and Critical Synthesis
+> **⚠️ Important**: All V2 techniques are **implemented in code** and ready for execution, but **no V2 experiments have been run on GPU hardware yet**. We make no performance claims for the V2 system until actual results are obtained and documented.
 
-### 7.1 The Transition from V1 Baseline to V2 System
+### 8.3 Immediate Next Steps
 
-Our empirical findings demonstrate a clear evolution:
-1. **Resolution of Minority Class Failure**: Baseline V1 achieved an F1 of 0.00 on the `Offensive` class due to subword tokenization fragmentation in XLM-RoBERTa and severe prior bias under raw `argmax` decisions. In V2, replacing XLM-RoBERTa with **MuRIL**, introducing **LP-FT** to prevent pre-trained feature corruption, and applying **Nelder-Mead Post-Hoc Threshold Calibration** recovered `Offensive` class F1 to **0.42+**.
-2. **Mitigation of Feature Corruption via LP-FT**: On small datasets ($N < 3,000$), un-frozen joint fine-tuning of randomly initialized fusion heads destabilizes pre-trained backbones. Phase 1 Linear Probing (LP) stabilizes fusion weights before Phase 2 full fine-tuning (FT), yielding a +4.2 pp Macro F1 gain.
-3. **Regularization via Manifold Mixup & Label Smoothing**: Interpolating representations in the 1536-dimensional fusion manifold ($\mathbf{h}_{\text{mix}} = \lambda \mathbf{h}_i + (1-\lambda)\mathbf{h}_j$) prevents the network from forming overconfident, sharp decision boundaries around isolated tail class training examples.
+1. Execute V2 5-fold cross-validation training across 3 Colab accounts using the prepared notebooks.
+2. Collect Out-of-Fold validation probabilities and compute calibrated Macro F1.
+3. Generate V2 confusion matrices, per-class F1 charts, and training curves.
+4. Update this paper with verified V2 empirical results.
+5. Generate final calibrated test set submission.
 
-### 7.2 Scalable Multi-Account Compute Architecture
-
-By partitioning the 5-fold cross-validation workload across **3 independent Google Colab accounts** executing concurrently:
-- **Account 1**: Folds 0 & 1 (`notebooks/02_v2_fold_0_1_training.ipynb`)
-- **Account 2**: Folds 2 & 3 (`notebooks/03_v2_fold_2_3_training.ipynb`)
-- **Account 3**: Fold 4 + Nelder-Mead Threshold Calibration + 5-Fold Ensemble (`notebooks/04_v2_fold_4_ensemble.ipynb`)
-
-We reduced total wall-clock training time by **60%** (from $\sim 2.5$ hours down to $\sim 1.0$ hour) while keeping memory and runtime requirements strictly within free-tier GPU constraints.
-
----
-
-## 8. Conclusion
-
-This paper presents the research evolution and complete engineering architecture of a state-of-the-art multimodal deep learning system for Punjabi meme sentiment classification in the IMUSA shared task at FIRE 2026. Starting from a functional Baseline V1 ($\text{ViT-Base} + \text{XLM-R}$, Macro F1: 0.4180), we introduced a series of principled architectural and training innovations:
-1. **MuRIL Punjabi Subword Text Representation** replacing generic XLM-RoBERTa.
-2. **Two-Stage LP-FT Protocol** preventing pre-trained feature corruption.
-3. **Label-Smoothed Focal Loss & Latent Manifold Mixup** regularizing minority class decision boundaries.
-4. **Stratified 5-Fold Cross-Validation Ensemble & Nelder-Mead Post-Hoc Threshold Calibration** eliminating single-split variance and counteracting majority class prior bias.
-
-Together, these enhancements elevate system performance to **Macro F1 > 0.65**, resolving the minority `Offensive` class failure (F1: $0.00 \rightarrow 0.42+$) and establishing a robust benchmark for multimodal low-resource Indic sentiment analysis.
-
-The complete codebase, including automated data preprocessing pipelines, multi-stage training scripts (`scripts/train_kfold.py`), multi-account Colab worker notebooks (`notebooks/02_v2_fold_0_1_training.ipynb` through `04_v2_fold_4_ensemble.ipynb`), unit test suites (33/33 passing), and inference engines, is publicly accessible at [https://github.com/shubhojit-mitra-dev/imusa-multimodal-sentiment](https://github.com/shubhojit-mitra-dev/imusa-multimodal-sentiment).
+The complete codebase, including automated data preprocessing pipelines, training scripts, unit test suites (33/33 passing), and inference engines, is publicly accessible at [https://github.com/shubhojit-mitra-dev/imusa-multimodal-sentiment](https://github.com/shubhojit-mitra-dev/imusa-multimodal-sentiment).
 
 ---
 
