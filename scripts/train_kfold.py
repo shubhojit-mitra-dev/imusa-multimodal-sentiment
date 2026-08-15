@@ -93,12 +93,17 @@ def train_single_fold(args: argparse.Namespace, fold_idx: int) -> tuple[np.ndarr
         vit_model_name=args.vision_model,
     ).to(device)
 
+    from imusa.models.loss import FocalLoss
+
+    criterion = FocalLoss(gamma=2.0, label_smoothing=0.05)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-2)
+
     trainer = Trainer(
         model=model,
-        train_dataloader=train_loader,
-        val_dataloader=val_loader,
-        learning_rate=args.lr,
-        epochs=args.epochs,
+        train_loader=train_loader,
+        val_loader=val_loader,
+        criterion=criterion,
+        optimizer=optimizer,
         device=device,
         output_dir=settings.versioned_output_dir,
     )
