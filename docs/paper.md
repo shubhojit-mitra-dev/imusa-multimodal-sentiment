@@ -380,21 +380,42 @@ $$
 
 Each fold maintains identical class proportions across training ($\frac{K-1}{K} \cdot |\mathcal{D}| \approx 2,312$ samples) and validation ($\frac{1}{K} \cdot |\mathcal{D}| \approx 579$ samples) partitions.
 
-#### Multi-Fold Probability Ensemble Inference
+### 5.4 Post-Hoc Threshold Calibration via Nelder-Mead Optimization
 
-For test set prediction, rather than relying on a single checkpoint, we ensemble predictions across all $K$ trained fold models. The ensemble probability for class $c$ given meme visual input $V$ and text input $T$ is computed by marginalizing across the $K$ model instances:
-
-$$
-P_{\text{ens}}(y = c \mid V, T) = \frac{1}{K} \sum_{k=1}^{K} P_k(y = c \mid V, T)
-$$
-
-The final predicted sentiment label corresponds to the maximum expected ensemble probability:
+Standard multi-class decision rules select category labels via uncalibrated `argmax` over raw output probabilities:
 
 $$
-\hat{y}_{\text{ens}} = \arg\max_{c \in \{0, 1, 2, 3\}} P_{\text{ens}}(y = c \mid V, T)
+\hat{y} = \arg\max_{c \in \{0, 1, 2, 3\}} P(y = c \mid V, T)
 $$
 
-This reduces prediction variance and smooths model calibration errors across decision boundaries.
+Under severe 25:1 class imbalance, uncalibrated `argmax` systematically suppresses minority classes (`Offensive` representing only 1.76% of data) because the dominant majority prior ($P(\text{Sarcasm}) = 0.44$) inflates majority probability estimates, forcing minority sample predictions into majority decision boundaries.
+
+To counteract this prior bias without modifying learned model weights, we implement **Post-Hoc Decision Threshold Calibration** [33]. We introduce a positive threshold vector $\boldsymbol{\tau} = [\tau_0, \tau_1, \tau_2, \tau_3]^T \in \mathbb{R}_+^4$ that scales class probabilities prior to decision assignment:
+
+$$
+\hat{y}(\boldsymbol{\tau}) = \arg\max_{c \in \{0, 1, 2, 3\}} \left( \frac{P(y = c \mid V, T)}{\tau_c} \right)
+$$
+
+The optimal threshold vector $\boldsymbol{\tau}^*$ is directly optimized on Out-of-Fold (OOF) validation probability outputs $\mathbf{P}_{\text{val}} \in \mathbb{R}^{N_{\text{val}} \times 4}$ to maximize Macro F1 score using **Nelder-Mead Simplex Search**:
+
+$$
+\boldsymbol{\tau}^* = \arg\max_{\boldsymbol{\tau} \in \mathbb{R}_+^4} \; \text{Macro-F1}\left( \mathbf{y}_{\text{val}}, \; \hat{\mathbf{y}}_{\text{val}}(\boldsymbol{\tau}) \right)
+$$
+
+```mermaid
+graph TD
+    subgraph Threshold_Calibration["Post-Hoc Threshold Calibration Pipeline"]
+        Val_Probs["OOF Validation Probabilities<br/>P_val ∈ ℝ^(N × 4)"] --> Scaled_P["Probability Scaling<br/>P̃_c = P_c / τ_c"]
+        Init_Tau["Initial Thresholds<br/>τ^(0) = [1.0, 1.0, 1.0, 1.0]"] --> Scaled_P
+        Scaled_P --> Argmax["Calibrated Decision<br/>ŷ = argmax(P̃_c)"]
+        Argmax --> MacroF1["Compute Validation<br/>Macro F1 Score"]
+        MacroF1 --> NM_Opt["Nelder-Mead Simplex Search<br/>scipy.optimize.minimize"]
+        NM_Opt -->|Update τ| Scaled_P
+        NM_Opt -->|Convergence| Opt_Tau["Optimal Thresholds τ*<br/>Saved to thresholds.json"]
+    end
+```
+
+The optimized threshold vector $\boldsymbol{\tau}^*$ is persisted to `outputs/v2/calibration/thresholds.json` and loaded during test set inference to produce calibrated ensemble predictions.
 
 The training CLI configuration is invoked as follows:
 
