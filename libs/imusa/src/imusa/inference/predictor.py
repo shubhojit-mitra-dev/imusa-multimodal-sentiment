@@ -122,3 +122,90 @@ class IMUSAPredictor:
 
         logger.info("Generated predictions for %d test samples.", len(results))
         return results
+
+
+class IMUSAEnsemblePredictor:
+    """Ensemble predictor combining predictions across K-fold checkpoints."""
+
+    def __init__(
+        self,
+        checkpoint_paths: list[str | Path] | None = None,
+        models: list[IMUSAMultimodalClassifier] | None = None,
+        device: str | None = None,
+    ) -> None:
+        """Initialize Ensemble Predictor.
+
+        Args:
+            checkpoint_paths: List of paths to fold checkpoints.
+            models: Optional pre-loaded list of model instances.
+            device: Computing device ('cuda' or 'cpu').
+        """
+        if device is None:
+            self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        else:
+            self.device = device
+
+        self.models: list[IMUSAMultimodalClassifier] = []
+        if models is not None:
+            self.models = models
+        elif checkpoint_paths is not None:
+            for path in checkpoint_paths:
+                p = Path(path)
+                if p.exists():
+                    predictor = IMUSAPredictor(checkpoint_path=p, device=self.device)
+                    self.models.append(predictor.model)
+                else:
+                    logger.warning("Checkpoint path %s not found; skipping fold.", p)
+
+        for m in self.models:
+            m.to(self.device)
+            m.eval()
+
+        logger.info("IMUSAEnsemblePredictor initialized with %d fold models.", len(self.models))
+
+    def predict_batch(self, dataloader: DataLoader[Any]) -> list[dict[str, Any]]:
+        """Generate ensemble predictions by averaging class probabilities across all folds."""
+        if not self.models:
+            raise ValueError("No fold models loaded in IMUSAEnsemblePredictor.")
+
+        results: list[dict[str, Any]] = []
+
+        with torch.no_grad():
+            for batch in dataloader:
+                images = batch["image"].to(self.device)
+                input_ids = batch["input_ids"].to(self.device)
+                attention_mask = batch.get("attention_mask")
+                if attention_mask is not None:
+                    attention_mask = attention_mask.to(self.device)
+
+                prob_sum = torch.zeros((images.size(0), settings.num_classes), device=self.device)
+                for model in self.models:
+                    model.eval()
+                    logits = model(images, input_ids, attention_mask)
+                    prob_sum += F.softmax(logits, dim=-1)
+
+                ensemble_probs = prob_sum / float(len(self.models))
+                confidences, pred_indices = torch.max(ensemble_probs, dim=-1)
+
+                batch_ids = batch.get("image_id", [f"sample_{i}" for i in range(len(images))])
+
+                for i in range(len(images)):
+                    pred_idx = int(pred_indices[i].item())
+                    conf_val = float(confidences[i].item())
+                    prob_dict = {
+                        category: float(ensemble_probs[i, c_idx].item())
+                        for c_idx, category in enumerate(settings.categories)
+                    }
+
+                    results.append(
+                        {
+                            "image_id": batch_ids[i],
+                            "predicted_category": settings.categories[pred_idx],
+                            "confidence": conf_val,
+                            "probabilities": prob_dict,
+                        }
+                    )
+
+        logger.info("Ensemble predictor generated predictions for %d samples.", len(results))
+        return results
+

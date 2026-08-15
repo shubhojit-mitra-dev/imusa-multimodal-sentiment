@@ -244,3 +244,73 @@ def create_stratified_dataloaders(
     )
 
     return train_loader, val_loader
+
+
+def create_kfold_dataloaders(
+    df: pd.DataFrame,
+    images_dir: Path,
+    tokenizer: Any,
+    num_folds: int = 5,
+    fold: int = 0,
+    batch_size: int = 16,
+    num_workers: int = 2,
+    seed: int = 42,
+) -> tuple[DataLoader, DataLoader]:  # type: ignore[type-arg]
+    """Create Stratified K-Fold train/val DataLoaders for a specific fold index (0 to num_folds - 1).
+
+    Ensures that extreme class imbalances are preserved identically across all folds.
+
+    Args:
+        df: Cleaned pandas DataFrame.
+        images_dir: Path to directory containing images.
+        tokenizer: Hugging Face tokenizer instance.
+        num_folds: Total number of folds (default: 5).
+        fold: Target fold index to reserve for validation (0 to num_folds - 1).
+        batch_size: Mini-batch size.
+        num_workers: Number of DataLoader parallel workers.
+        seed: Random seed for StratifiedKFold.
+
+    Returns:
+        Tuple of (train_dataloader, val_dataloader) for target fold.
+    """
+    from sklearn.model_selection import StratifiedKFold
+
+    skf = StratifiedKFold(n_splits=num_folds, shuffle=True, random_state=seed)
+    splits = list(skf.split(df, df["Category"]))
+
+    train_idx, val_idx = splits[fold]
+    train_df = df.iloc[train_idx].reset_index(drop=True)
+    val_df = df.iloc[val_idx].reset_index(drop=True)
+
+    train_dataset = IMUSADataset(
+        train_df, images_dir, tokenizer, img_transform=get_train_image_transform()
+    )
+    val_dataset = IMUSADataset(
+        val_df, images_dir, tokenizer, img_transform=get_default_image_transform()
+    )
+
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=num_workers,
+        pin_memory=True,
+    )
+    val_loader = DataLoader(
+        val_dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=num_workers,
+        pin_memory=True,
+    )
+
+    logger.info(
+        "K-Fold DataLoaders initialized (Fold %d/%d): Train samples=%d, Val samples=%d",
+        fold + 1,
+        num_folds,
+        len(train_dataset),
+        len(val_dataset),
+    )
+
+    return train_loader, val_loader
+

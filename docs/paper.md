@@ -370,24 +370,31 @@ This forces the classifier to maintain smooth linear transitions between sentime
 
 ---
 
-## 5. Experimental Setup
+### 5.3 Stratified $K$-Fold Cross-Validation and Multi-Fold Ensemble
 
-### 5.1 Implementation Details
+To eliminate single-split variance and maximize dataset utilization on 2,891 samples, we implement **Stratified $5$-Fold Cross-Validation** ($K = 5$):
 
-| Parameter | Value |
-|---|---|
-| **Framework** | PyTorch 2.x + Hugging Face Transformers |
-| **Python Version** | 3.12 (pinned via `.python-version`) |
-| **Package Manager** | `uv` (workspace mode with single lockfile) |
-| **Code Quality** | `ruff` (linting/formatting) + `mypy` (strict static typing) |
-| **Testing** | `pytest` with coverage tracking (87% line coverage) |
-| **Vision Backbone** | `google/vit-base-patch16-224` (ImageNet-21K pre-trained) |
-| **Text Backbone** | `xlm-roberta-base` (100-language Common Crawl pre-trained) |
-| **Max Text Length** | 128 tokens |
-| **Image Resolution** | $224 \times 224$ pixels |
-| **Interactive Notebook** | [Open in Google Colab](https://colab.research.google.com/drive/1i3uWNATbQFnO9fIJS-JiX-1qcjWIdxOr) |
+$$
+\mathcal{D} = \bigcup_{k=1}^{K} \mathcal{D}_k, \quad \mathcal{D}_i \cap \mathcal{D}_j = \emptyset \quad \forall i \neq j
+$$
 
-### 5.2 Training Protocol and Hyperparameter Rationale
+Each fold maintains identical class proportions across training ($\frac{K-1}{K} \cdot |\mathcal{D}| \approx 2,312$ samples) and validation ($\frac{1}{K} \cdot |\mathcal{D}| \approx 579$ samples) partitions.
+
+#### Multi-Fold Probability Ensemble Inference
+
+For test set prediction, rather than relying on a single checkpoint, we ensemble predictions across all $K$ trained fold models. The ensemble probability for class $c$ given meme visual input $V$ and text input $T$ is computed by marginalizing across the $K$ model instances:
+
+$$
+P_{\text{ens}}(y = c \mid V, T) = \frac{1}{K} \sum_{k=1}^{K} P_k(y = c \mid V, T)
+$$
+
+The final predicted sentiment label corresponds to the maximum expected ensemble probability:
+
+$$
+\hat{y}_{\text{ens}} = \arg\max_{c \in \{0, 1, 2, 3\}} P_{\text{ens}}(y = c \mid V, T)
+$$
+
+This reduces prediction variance and smooths model calibration errors across decision boundaries.
 
 The training CLI configuration is invoked as follows:
 
