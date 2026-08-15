@@ -8,7 +8,7 @@
 
 ---
 
-## 📌 Project Overview
+## Project Overview
 
 **IMUSA** is a multimodal AI system designed to analyze and classify Punjabi memes (visual images + embedded Gurmukhi script text) into 4 distinct sentiment categories:
 
@@ -26,7 +26,7 @@ The project is architected as an **end-to-end production ML ecosystem**, combini
 
 ---
 
-## 🏗️ Monorepo Architecture
+## Monorepo Architecture
 
 ```
 multimodal-ai-project/
@@ -47,7 +47,7 @@ multimodal-ai-project/
 
 ---
 
-## 🚀 Quickstart Guide
+## Quickstart Guide
 
 ### Prerequisites
 - Python 3.12+
@@ -69,7 +69,7 @@ make setup-hooks
 
 ---
 
-## 📊 Data Pipeline
+## Data Pipeline
 
 ### 1. Data Cleaning
 The raw CSV dataset contains multiline strings and unparsed character sequences. Run the cleaning pipeline to produce sanitized datasets:
@@ -89,7 +89,7 @@ make explore
 
 ---
 
-## 🛠️ Development & Quality Assurance
+## Development & Quality Assurance
 
 ```bash
 # Code Linting & Type Checking (Ruff + Mypy)
@@ -104,6 +104,6 @@ make test
 
 ---
 
-## 📄 License & Attribution
+## License & Attribution
 
 Developed for the IMUSA Shared Task FIRE 2026. Built with PyTorch, HuggingFace, FastAPI, and Next.js.
