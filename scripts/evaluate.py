@@ -10,7 +10,11 @@ from sklearn.metrics import classification_report, precision_recall_fscore_suppo
 
 from imusa.config import settings
 from imusa.data.dataset import create_stratified_dataloaders
-from imusa.evaluation.evaluator import plot_confusion_matrix, plot_per_class_f1, plot_training_curves
+from imusa.evaluation.evaluator import (
+    plot_confusion_matrix,
+    plot_per_class_f1,
+    plot_training_curves,
+)
 from imusa.inference.predictor import IMUSAPredictor
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
@@ -23,8 +27,8 @@ def main() -> None:
     parser.add_argument(
         "--checkpoint",
         type=str,
-        default="outputs/checkpoints/best_model.pt",
-        help="Path to trained model checkpoint",
+        default=None,
+        help="Path to trained model checkpoint (defaults to outputs/v1/checkpoints/best_model.pt)",
     )
     parser.add_argument(
         "--output-dir",
@@ -34,7 +38,13 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    checkpoint_path = Path(args.checkpoint)
+    if args.checkpoint is None:
+        candidate = settings.output_dir / "v1" / "checkpoints" / "best_model.pt"
+        if not candidate.exists():
+            candidate = settings.output_dir / "checkpoints" / "best_model.pt"
+        checkpoint_path = candidate
+    else:
+        checkpoint_path = Path(args.checkpoint)
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -43,6 +53,7 @@ def main() -> None:
 
     logger.info("Loading validation dataset...")
     from transformers import AutoTokenizer
+
     from imusa.data.cleaning import clean_dataset
 
     clean_df = clean_dataset(settings.raw_train_csv)
@@ -94,7 +105,9 @@ def main() -> None:
     # Generate plots
     plot_confusion_matrix(y_true_arr, y_pred_arr, output_path=output_dir / "confusion_matrix.png")
 
-    class_f1_dict = {cat: float(score) for cat, score in zip(settings.categories, f1_per_class)}
+    class_f1_dict = {
+        cat: float(score) for cat, score in zip(settings.categories, f1_per_class, strict=False)
+    }
     plot_per_class_f1(class_f1_dict, output_path=output_dir / "per_class_f1.png")
 
     # Generate history curve plot if checkpoint metadata contains history
