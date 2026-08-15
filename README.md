@@ -12,10 +12,10 @@
 
 **IMUSA** is a multimodal AI system designed to analyze and classify Punjabi memes (visual images + embedded Gurmukhi script text) into 4 distinct sentiment categories:
 
-1. **Sarcasm** — Irony, satire, or humor where visual context modifies textual meaning.
-2. **Neutral** — Objective observations or everyday statements without strong emotional polarity.
-3. **Offensive** — Harmful, toxic, or abusive content targeting individuals or groups.
-4. **Motivational** — Inspiring messages, quotes, or positive life advice.
+1. 😏 **Sarcasm** — Irony, satire, or humor where visual context modifies textual meaning.
+2. 😐 **Neutral** — Objective observations or everyday statements without strong emotional polarity.
+3. ⚠️ **Offensive** — Harmful, toxic, or abusive content targeting individuals or groups.
+4. 💪 **Motivational** — Inspiring messages, quotes, or positive life advice.
 
 The project is architected as an **end-to-end production ML ecosystem**, combining:
 - **Multimodal Deep Learning**: Vision Transformer (ViT) / CLIP + Multilingual Transformer (XLM-RoBERTa / MuRIL) with cross-attention fusion.
