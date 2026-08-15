@@ -35,12 +35,15 @@ def run_prediction_pipeline(
     settings.ensure_directories()
 
     if checkpoint_path is None:
-        checkpoint_path = settings.output_dir / "checkpoints" / "best_model.pt"
+        candidate_checkpoint = settings.checkpoint_dir / "best_model.pt"
+        if not candidate_checkpoint.exists():
+            candidate_checkpoint = settings.output_dir / "checkpoints" / "best_model.pt"
+        checkpoint_path = candidate_checkpoint
     else:
         checkpoint_path = Path(checkpoint_path)
 
     if output_path is None:
-        output_path = settings.output_dir / "submission.csv"
+        output_path = settings.submission_path
     else:
         output_path = Path(output_path)
 
