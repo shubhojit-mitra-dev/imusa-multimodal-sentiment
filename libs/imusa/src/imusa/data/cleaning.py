@@ -84,6 +84,18 @@ def clean_dataset(
 
     logger.info("Starting dataset cleaning pipeline on %s", raw_path)
 
+    # Auto-healing: Handle nested data/data directory structure if unzipped with extra data/ prefix
+    if not raw_path.exists():
+        nested_data_dir = settings.data_dir / "data"
+        if nested_data_dir.exists() and nested_data_dir.is_dir():
+            import shutil
+
+            logger.info("Normalizing nested dataset directory structure from data/data to data/")
+            for child in nested_data_dir.iterdir():
+                target = settings.data_dir / child.name
+                if not target.exists():
+                    shutil.move(str(child), str(target))
+
     if not raw_path.exists():
         raise FileNotFoundError(
             f"\n\n[ERROR] Raw dataset CSV file not found at: '{raw_path}'\n"
