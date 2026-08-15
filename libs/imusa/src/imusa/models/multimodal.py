@@ -41,6 +41,7 @@ class IMUSAMultimodalClassifier(nn.Module):
         text_model_name: str = "xlm-roberta-base",
         freeze_backbones: bool = False,
         dropout: float = 0.3,
+        vision_model_name: str | None = None,
     ) -> None:
         """Initialize Multimodal Sentiment Classifier.
 
@@ -50,8 +51,12 @@ class IMUSAMultimodalClassifier(nn.Module):
             text_model_name: Hugging Face model identifier for Text Transformer.
             freeze_backbones: If True, freezes pre-trained transformer backbones.
             dropout: Dropout probability in classification head.
+            vision_model_name: Alias for vit_model_name.
         """
         super().__init__()
+        if vision_model_name is not None:
+            vit_model_name = vision_model_name
+
         self.num_classes = num_classes
 
         self.vision_encoder = VisionEncoder(
