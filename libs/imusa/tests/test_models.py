@@ -10,7 +10,7 @@ from imusa.models.vision import VisionEncoder
 
 def test_vision_encoder_forward() -> None:
     """Verify VisionEncoder output tensor shape (batch_size, 768)."""
-    encoder = VisionEncoder(hidden_dim=768)
+    encoder = VisionEncoder(model_name="dummy/vit-base", hidden_dim=768)
     dummy_images = torch.randn(2, 3, 224, 224)
 
     output = encoder(dummy_images)
@@ -21,7 +21,7 @@ def test_vision_encoder_forward() -> None:
 
 def test_text_encoder_forward() -> None:
     """Verify TextEncoder output tensor shape (batch_size, 768)."""
-    encoder = TextEncoder(hidden_dim=768)
+    encoder = TextEncoder(model_name="dummy/xlm-roberta", hidden_dim=768)
     dummy_input_ids = torch.ones(2, 64, dtype=torch.long)
     dummy_mask = torch.ones(2, 64, dtype=torch.long)
 
@@ -45,7 +45,9 @@ def test_multimodal_fusion_forward() -> None:
 
 def test_multimodal_classifier_end_to_end() -> None:
     """Verify end-to-end forward pass through IMUSAMultimodalClassifier produces (batch_size, 4)."""
-    model = IMUSAMultimodalClassifier(num_classes=4)
+    model = IMUSAMultimodalClassifier(
+        num_classes=4, vit_model_name="dummy/vit", text_model_name="dummy/xlm-r"
+    )
     dummy_images = torch.randn(2, 3, 224, 224)
     dummy_input_ids = torch.ones(2, 64, dtype=torch.long)
     dummy_mask = torch.ones(2, 64, dtype=torch.long)
