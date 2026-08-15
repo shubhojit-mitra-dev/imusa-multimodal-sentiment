@@ -379,9 +379,15 @@ $$
 (V', T') = \left( \mathbf{T}_{\text{vision}}(V), \; \mathbf{T}_{\text{text}}(T) \right)
 $$
 
----
+### 4.7.4 Multi-Account Distributed Compute Infrastructure
 
-### 5.3 Stratified $K$-Fold Cross-Validation and Multi-Fold Ensemble
+To overcome single-session Google Colab runtime GPU quotas (T4/V100 GPU timeouts), we distribute 5-fold cross-validation training across **3 independent Google Colab accounts** executing concurrently:
+
+- **Account 1 (`notebooks/02_v2_fold_0_1_training.ipynb`)**: Executes Stratified Folds 0 and 1.
+- **Account 2 (`notebooks/03_v2_fold_2_3_training.ipynb`)**: Executes Stratified Folds 2 and 3.
+- **Account 3 (`notebooks/04_v2_fold_4_ensemble.ipynb`)**: Executes Stratified Fold 4, aggregates Out-of-Fold (OOF) probability matrices $\mathbf{P}_{\text{OOF}}$, performs Nelder-Mead threshold calibration, and computes the 5-fold probability ensemble predictions.
+
+This parallelization reduces total wall-clock training time by $60\%$ (from $\sim 2.5$ hours down to $\sim 1.0$ hour) while keeping each individual fold session well within standard free-tier Colab GPU limits.
 
 To eliminate single-split variance and maximize dataset utilization on 2,891 samples, we implement **Stratified $5$-Fold Cross-Validation** ($K = 5$):
 
