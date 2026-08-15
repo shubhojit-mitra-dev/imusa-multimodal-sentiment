@@ -67,7 +67,10 @@ def test_kfold_dataloaders_split_proportions() -> None:
     df = pd.DataFrame(
         {
             "Id": [f"{i}.jpg" for i in range(100)],
-            "Category": ["Sarcasm"] * 50 + ["Neutral"] * 30 + ["Motivational"] * 15 + ["Offensive"] * 5,
+            "Category": ["Sarcasm"] * 50
+            + ["Neutral"] * 30
+            + ["Motivational"] * 15
+            + ["Offensive"] * 5,
             "Text": ["text"] * 100,
         }
     )

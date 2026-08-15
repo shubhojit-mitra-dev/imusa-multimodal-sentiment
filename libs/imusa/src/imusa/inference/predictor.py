@@ -233,4 +233,3 @@ class IMUSAEnsemblePredictor:
 
         logger.info("Ensemble predictor generated predictions for %d samples.", len(results))
         return results
-

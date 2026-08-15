@@ -2,20 +2,25 @@
 
 import argparse
 import logging
+import sys
 from pathlib import Path
 
 import numpy as np
 import torch
 from sklearn.metrics import classification_report, precision_recall_fscore_support
 
-from imusa.config import settings
-from imusa.data.dataset import create_stratified_dataloaders
-from imusa.evaluation.evaluator import (
+# Add libs/imusa/src to sys.path so imusa is importable in any execution environment
+repo_root = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(repo_root / "libs" / "imusa" / "src"))
+
+from imusa.config import settings  # noqa: E402
+from imusa.data.dataset import create_stratified_dataloaders  # noqa: E402
+from imusa.evaluation.evaluator import (  # noqa: E402
     plot_confusion_matrix,
     plot_per_class_f1,
     plot_training_curves,
 )
-from imusa.inference.predictor import IMUSAPredictor
+from imusa.inference.predictor import IMUSAPredictor  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger(__name__)

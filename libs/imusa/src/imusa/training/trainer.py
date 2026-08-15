@@ -422,4 +422,3 @@ class Trainer:
         targets_np = torch.cat(all_targets, dim=0).numpy() if all_targets else np.array([])
 
         return probs_np, targets_np
-

@@ -2,14 +2,19 @@
 
 import argparse
 import logging
+import sys
 from pathlib import Path
 
 import pandas as pd
 from torch.utils.data import DataLoader
 
-from imusa.config import settings
-from imusa.data.dataset import IMUSADataset
-from imusa.inference.predictor import IMUSAPredictor
+# Add libs/imusa/src to sys.path so imusa is importable in any execution environment
+repo_root = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(repo_root / "libs" / "imusa" / "src"))
+
+from imusa.config import settings  # noqa: E402
+from imusa.data.dataset import IMUSADataset  # noqa: E402
+from imusa.inference.predictor import IMUSAPredictor  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger(__name__)

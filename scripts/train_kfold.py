@@ -6,17 +6,23 @@ saving fold model checkpoints and out-of-fold (OOF) validation probability matri
 
 import argparse
 import logging
+import sys
+from pathlib import Path
 
 import numpy as np
 import torch
 from transformers import AutoTokenizer
 
-from imusa.config import settings
-from imusa.data.cleaning import clean_dataset_pipeline
-from imusa.data.dataset import create_kfold_dataloaders
-from imusa.evaluation.calibration import optimize_thresholds, save_thresholds
-from imusa.models.multimodal import IMUSAMultimodalClassifier
-from imusa.training.trainer import Trainer
+# Add libs/imusa/src to sys.path so imusa is importable in any execution environment
+repo_root = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(repo_root / "libs" / "imusa" / "src"))
+
+from imusa.config import settings  # noqa: E402
+from imusa.data.cleaning import clean_dataset_pipeline  # noqa: E402
+from imusa.data.dataset import create_kfold_dataloaders  # noqa: E402
+from imusa.evaluation.calibration import optimize_thresholds, save_thresholds  # noqa: E402
+from imusa.models.multimodal import IMUSAMultimodalClassifier  # noqa: E402
+from imusa.training.trainer import Trainer  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -25,15 +31,30 @@ logger = logging.getLogger(__name__)
 def parse_args() -> argparse.Namespace:
     """Parse command line arguments for K-Fold training."""
     parser = argparse.ArgumentParser(description="IMUSA V2 Stratified K-Fold Training")
-    parser.add_argument("--fold", type=int, default=0, help="Target fold index to train (0 to num_folds - 1)")
-    parser.add_argument("--num-folds", type=int, default=5, help="Total number of stratified folds (default: 5)")
+    parser.add_argument(
+        "--fold", type=int, default=0, help="Target fold index to train (0 to num_folds - 1)"
+    )
+    parser.add_argument(
+        "--num-folds", type=int, default=5, help="Total number of stratified folds (default: 5)"
+    )
     parser.add_argument("--epochs", type=int, default=10, help="Total training epochs per fold")
-    parser.add_argument("--lp-epochs", type=int, default=3, help="Linear Probing initial epochs (default: 3)")
+    parser.add_argument(
+        "--lp-epochs", type=int, default=3, help="Linear Probing initial epochs (default: 3)"
+    )
     parser.add_argument("--batch-size", type=int, default=16, help="Mini-batch size")
     parser.add_argument("--lr", type=float, default=2e-5, help="Fine-tuning learning rate")
-    parser.add_argument("--text-model", type=str, default="google/muril-base-cased", help="Text encoder model")
-    parser.add_argument("--vision-model", type=str, default="google/vit-base-patch16-224", help="Vision encoder model")
-    parser.add_argument("--calibrate", action="store_true", help="Run threshold calibration across saved OOF files")
+    parser.add_argument(
+        "--text-model", type=str, default="google/muril-base-cased", help="Text encoder model"
+    )
+    parser.add_argument(
+        "--vision-model",
+        type=str,
+        default="google/vit-base-patch16-224",
+        help="Vision encoder model",
+    )
+    parser.add_argument(
+        "--calibrate", action="store_true", help="Run threshold calibration across saved OOF files"
+    )
     return parser.parse_args()
 
 
@@ -47,7 +68,9 @@ def train_single_fold(args: argparse.Namespace, fold_idx: int) -> tuple[np.ndarr
     Returns:
         Tuple of (oof_probs_array, oof_targets_array).
     """
-    logger.info("--- Starting Stratified K-Fold Training: Fold %d/%d ---", fold_idx + 1, args.num_folds)
+    logger.info(
+        "--- Starting Stratified K-Fold Training: Fold %d/%d ---", fold_idx + 1, args.num_folds
+    )
 
     # 1. Clean dataset
     df = clean_dataset_pipeline(settings.raw_train_csv, settings.data_dir / "processed")
