@@ -114,3 +114,52 @@ class IMUSAMultimodalClassifier(nn.Module):
 
         # 4. Predict sentiment logits
         return cast(torch.Tensor, self.classifier(fused_embeds))
+
+    def freeze_backbones(self) -> None:
+        """Freeze both vision and text encoder backbone weights for Linear Probing phase."""
+        self.vision_encoder.freeze()
+        self.text_encoder.freeze()
+        logger.info("Froze pre-trained backbones for Linear Probing phase.")
+
+    def unfreeze_backbones(self) -> None:
+        """Unfreeze both vision and text encoder backbone weights for Fine-Tuning phase."""
+        self.vision_encoder.unfreeze()
+        self.text_encoder.unfreeze()
+        logger.info("Unfroze pre-trained backbones for end-to-end Fine-Tuning phase.")
+
+    def forward_with_mixup(
+        self,
+        images: torch.Tensor,
+        input_ids: torch.Tensor,
+        attention_mask: torch.Tensor | None = None,
+        alpha: float = 0.2,
+    ) -> tuple[torch.Tensor, torch.Tensor, float]:
+        """Forward pass applying Manifold Mixup in the fused embedding space.
+
+        Args:
+            images: Tensor of shape (batch_size, 3, 224, 224).
+            input_ids: Tensor of shape (batch_size, max_length).
+            attention_mask: Tensor of shape (batch_size, max_length).
+            alpha: Beta distribution parameter for mixup ratio sampling.
+
+        Returns:
+            Tuple of (mixed_logits, permutation_indices, lambda_value).
+        """
+        vision_embeds = self.vision_encoder(images)
+        text_embeds = self.text_encoder(input_ids, attention_mask=attention_mask)
+        fused_embeds = self.fusion(vision_embeds, text_embeds)
+
+        batch_size = fused_embeds.size(0)
+        perm = torch.randperm(batch_size, device=fused_embeds.device)
+
+        if alpha > 0.0 and self.training:
+            import numpy as np
+
+            lam = float(np.random.beta(alpha, alpha))
+        else:
+            lam = 1.0
+
+        mixed_fused = lam * fused_embeds + (1.0 - lam) * fused_embeds[perm]
+        logits = self.classifier(mixed_fused)
+
+        return cast(torch.Tensor, logits), perm, lam
