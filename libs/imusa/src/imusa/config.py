@@ -34,6 +34,14 @@ class Settings(BaseSettings):
     output_dir: Path = base_dir / "outputs"
     exploration_output_dir: Path = output_dir / "exploration"
 
+    # Model Version & Architecture Configuration
+    model_version: str = "v1"
+    freeze_strategy: str = "none"  # Options: "none", "freeze", "lpft"
+    num_folds: int = 1  # 1 = single train/val split (V1), 5 = 5-fold CV (V2)
+    label_smoothing: float = 0.0  # Default 0.0 for V1; 0.05 for V2
+    use_mixup: bool = False  # Enable manifold mixup in fusion space
+    mixup_alpha: float = 0.2  # Beta distribution alpha for mixup ratio sampling
+
     # Pre-trained Model Hub Names
     vision_model_name: str = "google/vit-base-patch16-224"
     text_model_name: str = "xlm-roberta-base"
@@ -42,11 +50,34 @@ class Settings(BaseSettings):
     categories: ClassVar[list[str]] = ["Sarcasm", "Neutral", "Offensive", "Motivational"]
     num_classes: ClassVar[int] = 4
 
+    @property
+    def versioned_output_dir(self) -> Path:
+        """Return version-specific output directory (e.g. outputs/v1 or outputs/v2)."""
+        return self.output_dir / self.model_version
+
+    @property
+    def checkpoint_dir(self) -> Path:
+        """Return version-specific checkpoint directory (e.g. outputs/v1/checkpoints)."""
+        return self.versioned_output_dir / "checkpoints"
+
+    @property
+    def submission_path(self) -> Path:
+        """Return version-specific submission CSV path (e.g. outputs/v1/submission.csv)."""
+        return self.versioned_output_dir / "submission.csv"
+
+    @property
+    def calibration_dir(self) -> Path:
+        """Return version-specific calibration directory (e.g. outputs/v2/calibration)."""
+        return self.versioned_output_dir / "calibration"
+
     def ensure_directories(self) -> None:
-        """Create output and processed directories if they do not exist."""
+        """Create output, processed, versioned, checkpoint, and calibration directories if needed."""
         self.processed_dir.mkdir(parents=True, exist_ok=True)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.exploration_output_dir.mkdir(parents=True, exist_ok=True)
+        self.versioned_output_dir.mkdir(parents=True, exist_ok=True)
+        self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
+        self.calibration_dir.mkdir(parents=True, exist_ok=True)
 
 
 # Global singleton settings instance
