@@ -67,13 +67,17 @@ class Trainer:
     def __init__(
         self,
         model: nn.Module,
-        train_loader: DataLoader,  # type: ignore[type-arg]
-        val_loader: DataLoader,  # type: ignore[type-arg]
-        criterion: nn.Module,
-        optimizer: torch.optim.Optimizer,
+        train_loader: DataLoader | None = None,  # type: ignore[type-arg]
+        val_loader: DataLoader | None = None,  # type: ignore[type-arg]
+        criterion: nn.Module | None = None,
+        optimizer: torch.optim.Optimizer | None = None,
         scheduler: Any | None = None,
         device: str | None = None,
         output_dir: Path | None = None,
+        train_dataloader: DataLoader | None = None,  # type: ignore[type-arg]
+        val_dataloader: DataLoader | None = None,  # type: ignore[type-arg]
+        learning_rate: float = 2e-5,
+        epochs: int = 10,
     ) -> None:
         """Initialize Trainer instance.
 
@@ -81,17 +85,40 @@ class Trainer:
             model: Neural network model.
             train_loader: DataLoader containing training samples.
             val_loader: DataLoader containing validation samples.
-            criterion: Loss function module.
-            optimizer: Optimizer instance.
+            criterion: Loss function module (defaults to FocalLoss).
+            optimizer: Optimizer instance (defaults to AdamW).
             scheduler: Optional learning rate scheduler.
             device: Computing device string (default: CUDA if available, else CPU).
             output_dir: Directory for storing output checkpoints.
+            train_dataloader: Alias for train_loader.
+            val_dataloader: Alias for val_loader.
+            learning_rate: Default learning rate if optimizer is auto-created.
+            epochs: Total planned training epochs.
         """
         self.model = model
-        self.train_loader = train_loader
-        self.val_loader = val_loader
-        self.criterion = criterion
-        self.optimizer = optimizer
+        resolved_train = train_loader if train_loader is not None else train_dataloader
+        resolved_val = val_loader if val_loader is not None else val_dataloader
+
+        if resolved_train is None or resolved_val is None:
+            raise ValueError("Trainer requires both train_loader and val_loader DataLoaders.")
+
+        self.train_loader = resolved_train
+        self.val_loader = resolved_val
+
+        if criterion is None:
+            from imusa.models.loss import FocalLoss
+
+            self.criterion: nn.Module = FocalLoss(gamma=2.0, label_smoothing=0.05)
+        else:
+            self.criterion = criterion
+
+        if optimizer is None:
+            self.optimizer: torch.optim.Optimizer = torch.optim.AdamW(
+                model.parameters(), lr=learning_rate, weight_decay=1e-2
+            )
+        else:
+            self.optimizer = optimizer
+
         self.scheduler = scheduler
 
         if device is None:
