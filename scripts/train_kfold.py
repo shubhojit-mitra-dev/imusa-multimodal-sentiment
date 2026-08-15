@@ -90,7 +90,7 @@ def train_single_fold(args: argparse.Namespace, fold_idx: int) -> tuple[np.ndarr
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = IMUSAMultimodalClassifier(
         text_model_name=args.text_model,
-        vision_model_name=args.vision_model,
+        vit_model_name=args.vision_model,
     ).to(device)
 
     trainer = Trainer(
