@@ -383,3 +383,43 @@ class Trainer:
                 )
 
         return {"best_macro_f1": best_macro_f1, "history": history}
+
+    def evaluate_probabilities(
+        self,
+        dataloader: DataLoader[Any],
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Evaluate model on a DataLoader and return raw softmax probability matrix and ground truth targets.
+
+        Args:
+            dataloader: PyTorch DataLoader.
+
+        Returns:
+            Tuple of (probabilities_array, targets_array) of shape (N, 4) and (N,).
+        """
+        import numpy as np
+        import torch.nn.functional as F
+
+        self.model.eval()
+        all_probs: list[torch.Tensor] = []
+        all_targets: list[torch.Tensor] = []
+
+        with torch.no_grad():
+            for batch in dataloader:
+                images = batch["image"].to(self.device)
+                input_ids = batch["input_ids"].to(self.device)
+                attention_mask = batch.get("attention_mask")
+                if attention_mask is not None:
+                    attention_mask = attention_mask.to(self.device)
+
+                logits = self.model(images, input_ids, attention_mask)
+                probs = F.softmax(logits, dim=-1)
+                all_probs.append(probs.cpu())
+
+                if "label" in batch:
+                    all_targets.append(batch["label"].cpu())
+
+        probs_np = torch.cat(all_probs, dim=0).numpy()
+        targets_np = torch.cat(all_targets, dim=0).numpy() if all_targets else np.array([])
+
+        return probs_np, targets_np
+
