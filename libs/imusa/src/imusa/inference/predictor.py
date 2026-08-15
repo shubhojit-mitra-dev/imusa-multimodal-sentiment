@@ -76,11 +76,16 @@ class IMUSAPredictor:
 
         return model
 
-    def predict_batch(self, dataloader: DataLoader[Any]) -> list[dict[str, Any]]:
+    def predict_batch(
+        self,
+        dataloader: DataLoader[Any],
+        thresholds: list[float] | None = None,
+    ) -> list[dict[str, Any]]:
         """Generate category predictions and confidence scores for a dataset DataLoader.
 
         Args:
             dataloader: PyTorch DataLoader containing batch items.
+            thresholds: Optional calibrated threshold vector for threshold-adjusted classification.
 
         Returns:
             List of prediction dictionary records containing image_id, predicted_category,
@@ -99,12 +104,20 @@ class IMUSAPredictor:
 
                 logits = self.model(images, input_ids, attention_mask)
                 probabilities = F.softmax(logits, dim=-1)
-                confidences, pred_indices = torch.max(probabilities, dim=-1)
 
+                if thresholds is not None:
+                    from imusa.evaluation.calibration import apply_calibrated_thresholds
+
+                    probs_np = probabilities.cpu().numpy()
+                    pred_indices_np = apply_calibrated_thresholds(probs_np, thresholds)
+                else:
+                    pred_indices_np = torch.max(probabilities, dim=-1)[1].cpu().numpy()
+
+                confidences, _ = torch.max(probabilities, dim=-1)
                 batch_ids = batch.get("image_id", [f"sample_{i}" for i in range(len(images))])
 
                 for i in range(len(images)):
-                    pred_idx = int(pred_indices[i].item())
+                    pred_idx = int(pred_indices_np[i])
                     conf_val = float(confidences[i].item())
                     prob_dict = {
                         category: float(probabilities[i, c_idx].item())
@@ -163,7 +176,11 @@ class IMUSAEnsemblePredictor:
 
         logger.info("IMUSAEnsemblePredictor initialized with %d fold models.", len(self.models))
 
-    def predict_batch(self, dataloader: DataLoader[Any]) -> list[dict[str, Any]]:
+    def predict_batch(
+        self,
+        dataloader: DataLoader[Any],
+        thresholds: list[float] | None = None,
+    ) -> list[dict[str, Any]]:
         """Generate ensemble predictions by averaging class probabilities across all folds."""
         if not self.models:
             raise ValueError("No fold models loaded in IMUSAEnsemblePredictor.")
@@ -185,12 +202,20 @@ class IMUSAEnsemblePredictor:
                     prob_sum += F.softmax(logits, dim=-1)
 
                 ensemble_probs = prob_sum / float(len(self.models))
-                confidences, pred_indices = torch.max(ensemble_probs, dim=-1)
 
+                if thresholds is not None:
+                    from imusa.evaluation.calibration import apply_calibrated_thresholds
+
+                    probs_np = ensemble_probs.cpu().numpy()
+                    pred_indices_np = apply_calibrated_thresholds(probs_np, thresholds)
+                else:
+                    pred_indices_np = torch.max(ensemble_probs, dim=-1)[1].cpu().numpy()
+
+                confidences, _ = torch.max(ensemble_probs, dim=-1)
                 batch_ids = batch.get("image_id", [f"sample_{i}" for i in range(len(images))])
 
                 for i in range(len(images)):
-                    pred_idx = int(pred_indices[i].item())
+                    pred_idx = int(pred_indices_np[i])
                     conf_val = float(confidences[i].item())
                     prob_dict = {
                         category: float(ensemble_probs[i, c_idx].item())
