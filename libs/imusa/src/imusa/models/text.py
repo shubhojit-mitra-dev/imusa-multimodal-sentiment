@@ -58,6 +58,18 @@ class TextEncoder(nn.Module):
             self.backbone = None
             self.dummy_embedding = nn.Embedding(250000, hidden_dim)
 
+    def freeze(self) -> None:
+        """Freeze pre-trained backbone parameters."""
+        if self.backbone is not None:
+            for param in self.backbone.parameters():
+                param.requires_grad = False
+
+    def unfreeze(self) -> None:
+        """Unfreeze pre-trained backbone parameters for fine-tuning."""
+        if self.backbone is not None:
+            for param in self.backbone.parameters():
+                param.requires_grad = True
+
     def forward(
         self,
         input_ids: torch.Tensor,
