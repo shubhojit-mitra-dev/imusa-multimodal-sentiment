@@ -334,7 +334,7 @@ with smoothing factor $\epsilon = 0.05$. This prevents the cross-entropy objecti
 
 ### 4.7 Proposed V2 Training Strategies (Pending Experimental Validation)
 
-> **⚠️ Status Note**: The following techniques (§4.7.1–§4.7.4) have been **implemented in code** (`scripts/train_kfold.py`, `libs/imusa/src/imusa/evaluation/calibration.py`, `libs/imusa/src/imusa/data/augmentation.py`) but have **not yet been executed on GPU hardware**. No empirical V2 results exist at the time of writing. The V2 experimental validation is the immediate next step in this research. All performance claims in §6 refer exclusively to the V1 baseline system.
+> **Note (Status)**: The following techniques (§4.7.1–§4.7.4) have been **implemented in code** (`scripts/train_kfold.py`, `libs/imusa/src/imusa/evaluation/calibration.py`, `libs/imusa/src/imusa/data/augmentation.py`) but have **not yet been executed on GPU hardware**. No empirical V2 results exist at the time of writing. The V2 experimental validation is the immediate next step in this research. All performance claims in §6 refer exclusively to the V1 baseline system.
 
 #### 4.7.1 Linear Probing before Fine-Tuning (LP-FT)
 
@@ -622,7 +622,7 @@ Motivated by the V1 limitations documented in §7.5, we have designed and implem
 5. **Stratified 5-Fold Cross-Validation Ensemble** — eliminating single-split variance.
 6. **Nelder-Mead Post-Hoc Threshold Calibration** — counteracting majority class prior bias.
 
-> **⚠️ Important**: All V2 techniques are **implemented in code** and ready for execution, but **no V2 experiments have been run on GPU hardware yet**. We make no performance claims for the V2 system until actual results are obtained and documented.
+> **Note (Important)**: All V2 techniques are **implemented in code** and ready for execution, but **no V2 experiments have been run on GPU hardware yet**. We make no performance claims for the V2 system until actual results are obtained and documented.
 
 ### 8.3 Immediate Next Steps
 
