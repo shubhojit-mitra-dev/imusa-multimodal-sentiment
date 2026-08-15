@@ -8,6 +8,7 @@ from torch.utils.data import DataLoader, Dataset
 
 from imusa.config import settings
 from imusa.inference.predictor import IMUSAPredictor
+from imusa.models.multimodal import IMUSAMultimodalClassifier
 
 
 class TinyTestDataset(Dataset):  # type: ignore[type-arg]
@@ -30,7 +31,10 @@ class TinyTestDataset(Dataset):  # type: ignore[type-arg]
 
 def test_predictor_initialization() -> None:
     """Verify IMUSAPredictor initializes properly with default device."""
-    predictor = IMUSAPredictor(device="cpu")
+    dummy_model = IMUSAMultimodalClassifier(
+        num_classes=4, vit_model_name="dummy/vit", text_model_name="dummy/xlm-r"
+    )
+    predictor = IMUSAPredictor(model=dummy_model, device="cpu")
     assert predictor.device == "cpu"
     assert isinstance(predictor.model, nn.Module)
 
@@ -40,7 +44,10 @@ def test_predictor_predict_batch() -> None:
     dataset = TinyTestDataset(size=4)
     loader = DataLoader(dataset, batch_size=2)
 
-    predictor = IMUSAPredictor(device="cpu")
+    dummy_model = IMUSAMultimodalClassifier(
+        num_classes=4, vit_model_name="dummy/vit", text_model_name="dummy/xlm-r"
+    )
+    predictor = IMUSAPredictor(model=dummy_model, device="cpu")
     results = predictor.predict_batch(loader)
 
     assert len(results) == 4
