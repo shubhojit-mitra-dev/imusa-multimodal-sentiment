@@ -105,8 +105,12 @@ class Trainer:
         self.model.to(self.device)
         logger.info("Trainer initialized on device: %s", self.device)
 
-    def train_epoch(self) -> float:
-        """Train model for one full epoch.
+    def train_epoch(self, use_mixup: bool = False, mixup_alpha: float = 0.2) -> float:
+        """Train model for one full epoch with optional manifold mixup.
+
+        Args:
+            use_mixup: Whether to apply manifold mixup in fusion space.
+            mixup_alpha: Beta distribution parameter for mixup ratio sampling.
 
         Returns:
             Average training loss over the epoch.
@@ -121,8 +125,18 @@ class Trainer:
             labels = batch["label"].to(self.device)
 
             self.optimizer.zero_grad()
-            logits = self.model(images, input_ids, attention_mask=attention_mask)
-            loss = self.criterion(logits, labels)
+
+            mixup_fn = getattr(self.model, "forward_with_mixup", None)
+            if use_mixup and callable(mixup_fn):
+                logits, perm, lam = mixup_fn(
+                    images, input_ids, attention_mask=attention_mask, alpha=mixup_alpha
+                )
+                loss = lam * self.criterion(logits, labels) + (1.0 - lam) * self.criterion(
+                    logits, labels[perm]
+                )
+            else:
+                logits = self.model(images, input_ids, attention_mask=attention_mask)
+                loss = self.criterion(logits, labels)
 
             loss.backward()
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
@@ -193,11 +207,18 @@ class Trainer:
 
         return metrics
 
-    def fit(self, epochs: int = 5) -> dict[str, Any]:
+    def fit(
+        self,
+        epochs: int = 5,
+        use_mixup: bool = False,
+        mixup_alpha: float = 0.2,
+    ) -> dict[str, Any]:
         """Execute full model training over specified number of epochs.
 
         Args:
             epochs: Number of training epochs (default: 5).
+            use_mixup: Whether to enable manifold mixup.
+            mixup_alpha: Beta distribution parameter for mixup.
 
         Returns:
             Dictionary containing best validation Macro F1 score and epoch logs.
@@ -210,7 +231,7 @@ class Trainer:
         history: list[dict[str, Any]] = []
 
         for epoch in range(1, epochs + 1):
-            train_loss = self.train_epoch()
+            train_loss = self.train_epoch(use_mixup=use_mixup, mixup_alpha=mixup_alpha)
             val_metrics = self.evaluate()
 
             macro_f1 = val_metrics["macro_f1"]
@@ -247,6 +268,118 @@ class Trainer:
                     "Saved new best model checkpoint to %s (Macro F1=%.4f)",
                     best_checkpoint_path,
                     best_macro_f1,
+                )
+
+        return {"best_macro_f1": best_macro_f1, "history": history}
+
+    def fit_lpft(
+        self,
+        lp_epochs: int = 3,
+        ft_epochs: int = 7,
+        lp_lr: float = 1e-3,
+        ft_lr: float = 2e-5,
+        use_mixup: bool = False,
+        mixup_alpha: float = 0.2,
+    ) -> dict[str, Any]:
+        """Execute Linear Probing -> Fine-Tuning (LP-FT) multi-stage training protocol.
+
+        Phase 1: Freeze backbones, train only fusion & classification head.
+        Phase 2: Unfreeze backbones, fine-tune end-to-end.
+
+        Args:
+            lp_epochs: Number of linear probing epochs.
+            ft_epochs: Number of fine-tuning epochs.
+            lp_lr: Learning rate for linear probing phase.
+            ft_lr: Learning rate for fine-tuning phase.
+            use_mixup: Whether to enable manifold mixup.
+            mixup_alpha: Mixup alpha parameter.
+
+        Returns:
+            Dictionary containing best validation Macro F1 score and epoch logs.
+        """
+        best_macro_f1 = -1.0
+        best_checkpoint_path = self.output_dir / "best_model.pt"
+        history: list[dict[str, Any]] = []
+
+        # --- Phase 1: Linear Probing ---
+        freeze_fn = getattr(self.model, "freeze_backbones", None)
+        if callable(freeze_fn):
+            freeze_fn()
+
+        trainable_params = [p for p in self.model.parameters() if p.requires_grad]
+        lp_optimizer = torch.optim.AdamW(trainable_params, lr=lp_lr, weight_decay=1e-2)
+        original_optimizer = self.optimizer
+        original_scheduler = self.scheduler
+
+        self.optimizer = lp_optimizer
+        self.scheduler = None
+
+        logger.info("=== Phase 1: Linear Probing (%d epochs, lr=%.1e) ===", lp_epochs, lp_lr)
+        for epoch in range(1, lp_epochs + 1):
+            train_loss = self.train_epoch(use_mixup=use_mixup, mixup_alpha=mixup_alpha)
+            val_metrics = self.evaluate()
+            macro_f1 = val_metrics["macro_f1"]
+
+            logger.info(
+                "LP Epoch %d/%d - Train Loss: %.4f | Val Loss: %.4f | Val Acc: %.4f | Val Macro F1: %.4f",
+                epoch,
+                lp_epochs,
+                train_loss,
+                val_metrics["val_loss"],
+                val_metrics["accuracy"],
+                macro_f1,
+            )
+
+            epoch_log = {"epoch": epoch, "phase": "lp", "train_loss": train_loss, **val_metrics}
+            history.append(epoch_log)
+
+            if macro_f1 > best_macro_f1:
+                best_macro_f1 = macro_f1
+                torch.save(
+                    {
+                        "epoch": epoch,
+                        "model_state_dict": self.model.state_dict(),
+                        "macro_f1": best_macro_f1,
+                    },
+                    best_checkpoint_path,
+                )
+
+        # --- Phase 2: End-to-End Fine-Tuning ---
+        unfreeze_fn = getattr(self.model, "unfreeze_backbones", None)
+        if callable(unfreeze_fn):
+            unfreeze_fn()
+
+        self.optimizer = original_optimizer
+        self.scheduler = original_scheduler
+
+        logger.info("=== Phase 2: Full Fine-Tuning (%d epochs, lr=%.1e) ===", ft_epochs, ft_lr)
+        for epoch in range(lp_epochs + 1, lp_epochs + ft_epochs + 1):
+            train_loss = self.train_epoch(use_mixup=use_mixup, mixup_alpha=mixup_alpha)
+            val_metrics = self.evaluate()
+            macro_f1 = val_metrics["macro_f1"]
+
+            logger.info(
+                "FT Epoch %d/%d - Train Loss: %.4f | Val Loss: %.4f | Val Acc: %.4f | Val Macro F1: %.4f",
+                epoch - lp_epochs,
+                ft_epochs,
+                train_loss,
+                val_metrics["val_loss"],
+                val_metrics["accuracy"],
+                macro_f1,
+            )
+
+            epoch_log = {"epoch": epoch, "phase": "ft", "train_loss": train_loss, **val_metrics}
+            history.append(epoch_log)
+
+            if macro_f1 > best_macro_f1:
+                best_macro_f1 = macro_f1
+                torch.save(
+                    {
+                        "epoch": epoch,
+                        "model_state_dict": self.model.state_dict(),
+                        "macro_f1": best_macro_f1,
+                    },
+                    best_checkpoint_path,
                 )
 
         return {"best_macro_f1": best_macro_f1, "history": history}
