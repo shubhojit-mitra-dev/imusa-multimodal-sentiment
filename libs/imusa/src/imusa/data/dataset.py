@@ -87,6 +87,7 @@ class IMUSADataset(Dataset):  # type: ignore[type-arg]
         max_length: int = 128,
         is_test: bool = False,
         img_transform: transforms.Compose | None = None,
+        use_text_aug: bool = False,
     ) -> None:
         """Initialize the IMUSA Dataset.
 
@@ -97,6 +98,7 @@ class IMUSADataset(Dataset):  # type: ignore[type-arg]
             max_length: Max sequence length for tokenization (default: 128).
             is_test: Set True for un-labeled test dataset.
             img_transform: Custom torchvision transforms (default: ImageNet standard).
+            use_text_aug: Set True to enable online text word swap/deletion augmentation.
         """
         self.df = df.reset_index(drop=True)
         self.images_dir = images_dir
@@ -104,6 +106,7 @@ class IMUSADataset(Dataset):  # type: ignore[type-arg]
         self.max_length = max_length
         self.is_test = is_test
         self.img_transform = img_transform or get_default_image_transform()
+        self.use_text_aug = use_text_aug
 
         # Map sentiment categories to zero-indexed integer targets
         self.category_to_idx = {cat: idx for idx, cat in enumerate(settings.categories)}
@@ -129,6 +132,11 @@ class IMUSADataset(Dataset):  # type: ignore[type-arg]
         row = self.df.iloc[idx]
         image_id = str(row["Id"])
         text_content = str(row["Text"])
+
+        if self.use_text_aug and not self.is_test:
+            from imusa.data.augmentation import augment_text
+
+            text_content = augment_text(text_content)
 
         # 1. Load and transform vision modality
         img_path = self.images_dir / image_id

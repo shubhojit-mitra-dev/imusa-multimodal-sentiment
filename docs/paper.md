@@ -361,12 +361,23 @@ $$
 
 This forces the classifier to maintain smooth linear transitions between sentiment categories in the latent fusion manifold.
 
-        if self.alpha is not None:
-            alpha_t = self.alpha.to(logits.device)[targets]
-            loss = alpha_t * loss
+#### 4.7.3 Multimodal Data Augmentation Pipeline
 
-        return loss.mean()
-```
+To expand dataset effective sample size and combat overfitting on low-resource Gurmukhi script text and image memes, we incorporate online multimodal data augmentation during training [36, 37]:
+
+1. **Vision Augmentation ($\mathbf{T}_{\text{vision}}$)**:
+   - **Spatial Transformations**: Random horizontal flipping ($p = 0.5$) and random rotation ($\theta \in [-10^\circ, 10^\circ]$).
+   - **Photometric Jitter**: Color jitter on brightness ($15\%$), contrast ($15\%$), and saturation ($15\%$).
+   - **Random Erasing (Cutout)**: Occludes random rectangular visual patches ($s \in [0.02, 0.20]$, $p = 0.20$) to force the vision encoder to rely on global structural cues rather than isolated background artifacts.
+
+2. **Text Easy Data Augmentation ($\mathbf{T}_{\text{text}}$)**:
+   Following **Wei & Zou [36]**, text strings undergo subword-preserving Easy Data Augmentation:
+   - **Random Word Deletion**: Deletes words with probability $p_{\text{del}} = 0.10$.
+   - **Adjacent Word Swap**: Swaps position of adjacent subword tokens with probability $p_{\text{swap}} = 0.10$.
+
+$$
+(V', T') = \left( \mathbf{T}_{\text{vision}}(V), \; \mathbf{T}_{\text{text}}(T) \right)
+$$
 
 ---
 
