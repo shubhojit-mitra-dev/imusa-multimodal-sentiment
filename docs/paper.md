@@ -316,38 +316,50 @@ $$
 
 where $W_1 \in \mathbb{R}^{512 \times 1536}$, $W_2 \in \mathbb{R}^{4 \times 512}$ are learnable weight matrices. The output logits $\mathbf{z}$ correspond to the 4 sentiment categories.
 
-### 4.6 Loss Function: $\alpha$-Balanced Focal Loss
+### 4.6 Loss Function: Label-Smoothed $\alpha$-Balanced Focal Loss
 
-To address the 25:1 class imbalance, we employ Focal Loss [14] with inverse class-frequency weighting:
+To address the 25:1 class imbalance while preventing overconfident predictions on minority classes, we employ **Label-Smoothed $\alpha$-Balanced Focal Loss** [14, 31, 32]:
 
 $$
-\mathcal{L}_{\text{Focal}} = -\sum_{c=1}^{K} \alpha_c (1 - p_c)^\gamma y_c \log(p_c)
+\mathcal{L}_{\text{Focal}}^{\text{LS}} = -\sum_{c=1}^{K} \alpha_c (1 - p_c)^\gamma y_c^{\text{LS}} \log(p_c)
 $$
 
-where $p_c = \text{softmax}(\mathbf{z})_c$, $\gamma = 2.0$, and $\alpha_c = \frac{N}{K \cdot N_c}$.
+where $p_c = \text{softmax}(\mathbf{z})_c$, $\gamma = 2.0$, and $\alpha_c = \frac{N}{K \cdot N_c}$. The smoothed targets $y_c^{\text{LS}}$ are defined as:
 
-#### Algorithm 2: PyTorch Implementation of $\alpha$-Balanced Focal Loss
+$$
+y_c^{\text{LS}} = (1 - \epsilon) \cdot \mathbb{I}(y = c) + \frac{\epsilon}{K}
+$$
 
-```python
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
+with smoothing factor $\epsilon = 0.05$. This prevents the cross-entropy objective from driving logit magnitudes to infinity, regularizing the model against over-fitting on noisy subword tokens.
 
+### 4.7 Advanced Training Strategies for V2 Evolution
 
-class FocalLoss(nn.Module):
-    """α-Balanced Focal Loss for imbalanced multimodal classification."""
+#### 4.7.1 Linear Probing before Fine-Tuning (LP-FT)
 
-    def __init__(self, gamma: float = 2.0, alpha: torch.Tensor | None = None) -> None:
-        super().__init__()
-        self.gamma = gamma
-        self.alpha = alpha  # Tensor of shape (K,) with inverse class frequencies
+Following **Kumar et al. [30]**, full fine-tuning of pre-trained transformer backbones on small datasets ($N < 3,000$) can distort pre-trained feature representations when randomly initialized fusion head weights emit large initial gradient updates. We implement a two-stage LP-FT protocol:
 
-    def forward(self, logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
-        # logits: (batch_size, K), targets: (batch_size,)
-        ce_loss = F.cross_entropy(logits, targets, reduction="none")
-        p_t = torch.exp(-ce_loss)  # Model confidence on target class
-        focal_weight = (1.0 - p_t) ** self.gamma
-        loss = focal_weight * ce_loss
+1. **Phase 1 — Linear Probing (LP)**: Freeze both ViT and MuRIL backbones ($\text{requires\_grad} = \text{False}$). Train only the Gated Multimodal Fusion layer and classification head for 3 epochs with learning rate $\eta_{\text{LP}} = 10^{-3}$ and weight decay $10^{-2}$.
+2. **Phase 2 — End-to-End Fine-Tuning (FT)**: Unfreeze all backbone parameters ($\text{requires\_grad} = \text{True}$). Fine-tune the entire network end-to-end for 7 epochs using AdamW with cosine annealing and lower learning rate $\eta_{\text{FT}} = 2 \times 10^{-5}$.
+
+#### 4.7.2 Manifold Mixup in Multimodal Fusion Space
+
+To regularize decision boundaries in the joint vision-language space, we adopt **Manifold Mixup** [34, 35] applied directly to the fused feature representations $\mathbf{h}_{\text{fused}} \in \mathbb{R}^{1536}$:
+
+$$
+\lambda \sim \text{Beta}(\alpha_{\text{mix}}, \alpha_{\text{mix}}), \quad \alpha_{\text{mix}} = 0.2
+$$
+
+$$
+\mathbf{h}_{\text{mix}} = \lambda \mathbf{h}_{\text{fused}}^{(i)} + (1 - \lambda) \mathbf{h}_{\text{fused}}^{(j)}
+$$
+
+The classification loss on mixed embeddings interpolates loss contributions:
+
+$$
+\mathcal{L}_{\text{mix}} = \lambda \mathcal{L}\left(f(\mathbf{h}_{\text{mix}}), y^{(i)}\right) + (1 - \lambda) \mathcal{L}\left(f(\mathbf{h}_{\text{mix}}), y^{(j)}\right)
+$$
+
+This forces the classifier to maintain smooth linear transitions between sentiment categories in the latent fusion manifold.
 
         if self.alpha is not None:
             alpha_t = self.alpha.to(logits.device)[targets]
@@ -640,3 +652,24 @@ The system is implemented as a fully reproducible open-source pipeline with comp
 27. Tsai, Y.-H. H., Bai, S., Liang, P. P., Kolter, J. Z., Morency, L.-P., & Salakhutdinov, R. (2019). Multimodal Transformer for Unaligned Multimodal Language Sequences. *ACL 2019*, 6558–6569.
 
 28. Wang, Y., Jiang, W., & Luo, X. (2021). Handling Class Imbalance in Text Classification via Focal Loss. *IEEE Access*, 9, 82312–82322.
+
+29. Khanuja, S., Bansal, D., Mehtani, S., Khosla, S., Dey, A., Gopalan, B., Kumar, P., Aggarwal, G., & Khapra, M. M. (2021). MuRIL: Multilingual Representations for Indian Languages. *arXiv preprint arXiv:2103.10730*, Google Research.
+
+30. Kumar, A., Raghunathan, A., Jones, R., Ma, T., & Liang, P. (2022). Fine-Tuning Can Distort Pretrained Features and Underperform Out-of-Distribution. *ICLR 2022*.
+
+31. Szegedy, C., Vanhoucke, V., Ioffe, S., Shlens, J., & Wojna, Z. (2016). Rethinking the Inception Architecture for Computer Vision. *CVPR 2016*, 2818–2826.
+
+32. Müller, R., Kornblith, S., & Hinton, G. E. (2019). When Does Label Smoothing Help? *NeurIPS 2019*, 32, 4696–4705.
+
+33. Guo, C., Pleiss, G., Sun, Y., & Weinberger, K. Q. (2017). On Calibration of Modern Neural Networks. *ICML 2017*, 70, 1321–1330.
+
+34. Zhang, H., Cisse, M., Dauphin, Y. N., & Lopez-Paz, D. (2018). mixup: Beyond Empirical Risk Minimization. *ICLR 2018*.
+
+35. Verma, V., Lamb, A., Beckham, C., Najafi, A., Carranza, A. M., Zhang, D., Bengio, Y., & Courville, A. (2019). Manifold Mixup: Better Representations via Interpolating Hidden States. *ICML 2019*, 97, 6438–6447.
+
+36. Wei, J., & Zou, K. (2019). EDA: Easy Data Augmentation Techniques for Boosting Performance on Text Classification Tasks. *EMNLP-IJCNLP 2019*, 6382–6388.
+
+37. Howard, J., & Ruder, S. (2018). Universal Language Model Fine-tuning for Text Classification. *ACL 2018*, 328–339.
+
+38. Formaggio, A., et al. (2025). Multimodal Meme Understanding and Sentiment Analysis in Indic Languages. *Proceedings of FIRE 2025/2026 Shared Tasks*.
+
