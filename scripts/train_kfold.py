@@ -18,7 +18,7 @@ repo_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(repo_root / "libs" / "imusa" / "src"))
 
 from imusa.config import settings  # noqa: E402
-from imusa.data.cleaning import clean_dataset_pipeline  # noqa: E402
+from imusa.data.cleaning import clean_dataset  # noqa: E402
 from imusa.data.dataset import create_kfold_dataloaders  # noqa: E402
 from imusa.evaluation.calibration import optimize_thresholds, save_thresholds  # noqa: E402
 from imusa.models.multimodal import IMUSAMultimodalClassifier  # noqa: E402
@@ -73,7 +73,7 @@ def train_single_fold(args: argparse.Namespace, fold_idx: int) -> tuple[np.ndarr
     )
 
     # 1. Clean dataset
-    df = clean_dataset_pipeline(settings.raw_train_csv, settings.data_dir / "processed")
+    df = clean_dataset()
 
     # 2. Tokenizer & DataLoaders
     tokenizer = AutoTokenizer.from_pretrained(args.text_model)
