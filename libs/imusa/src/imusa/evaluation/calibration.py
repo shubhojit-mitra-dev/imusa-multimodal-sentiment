@@ -17,7 +17,9 @@ from imusa.config import settings
 logger = logging.getLogger(__name__)
 
 
-def apply_calibrated_thresholds(probs: np.ndarray, thresholds: list[float] | np.ndarray) -> np.ndarray:
+def apply_calibrated_thresholds(
+    probs: np.ndarray, thresholds: list[float] | np.ndarray
+) -> np.ndarray:
     """Apply calibrated decision threshold scaling factors to probability matrix.
 
     Formula:

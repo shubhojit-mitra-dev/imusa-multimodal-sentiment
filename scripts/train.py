@@ -3,16 +3,22 @@
 
 import argparse
 import logging
+import sys
+from pathlib import Path
 
 import torch
 import torch.nn as nn
 
-from imusa.config import settings
-from imusa.data.cleaning import clean_dataset
-from imusa.data.dataset import create_stratified_dataloaders
-from imusa.models.loss import FocalLoss, compute_inverse_class_weights
-from imusa.models.multimodal import IMUSAMultimodalClassifier
-from imusa.training.trainer import Trainer
+# Add libs/imusa/src to sys.path so imusa is importable in any execution environment
+repo_root = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(repo_root / "libs" / "imusa" / "src"))
+
+from imusa.config import settings  # noqa: E402
+from imusa.data.cleaning import clean_dataset  # noqa: E402
+from imusa.data.dataset import create_stratified_dataloaders  # noqa: E402
+from imusa.models.loss import FocalLoss, compute_inverse_class_weights  # noqa: E402
+from imusa.models.multimodal import IMUSAMultimodalClassifier  # noqa: E402
+from imusa.training.trainer import Trainer  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
