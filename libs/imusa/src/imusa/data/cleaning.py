@@ -177,3 +177,7 @@ def _print_summary(summary: CleaningSummary) -> None:
     table.add_row("Final Clean Dataset Size", str(summary.final_clean_rows), style="bold gold1")
 
     console.print(table)
+
+
+# Alias for backward compatibility across scripts
+clean_dataset_pipeline = clean_dataset
