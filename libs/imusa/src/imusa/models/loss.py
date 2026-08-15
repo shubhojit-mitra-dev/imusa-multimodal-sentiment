@@ -61,19 +61,23 @@ class FocalLoss(nn.Module):
 
     Focal loss addresses class imbalance by down-weighting well-classified (easy)
     examples and focusing model training on hard, misclassified minority samples.
+    Supports label smoothing and soft target distributions (e.g. from mixup).
 
     Formula:
-        L_focal = - alpha_t * (1 - p_t)^gamma * log(p_t)
+        L_focal = - sum_c [ alpha_c * y_c * (1 - p_c)^gamma * log(p_c) ]
 
     Attributes:
         gamma: Focusing parameter scaling down easy samples (default: 2.0).
         alpha: Optional class weight tensor of shape (num_classes,).
+        label_smoothing: Float label smoothing factor (default: 0.0).
+        reduction: 'mean', 'sum', or 'none' loss reduction.
     """
 
     def __init__(
         self,
         gamma: float = 2.0,
         alpha: torch.Tensor | None = None,
+        label_smoothing: float = 0.0,
         reduction: str = "mean",
     ) -> None:
         """Initialize Focal Loss.
@@ -81,41 +85,47 @@ class FocalLoss(nn.Module):
         Args:
             gamma: Focusing exponent (higher values focus more on hard samples).
             alpha: Class weights tensor of shape (num_classes,).
+            label_smoothing: Smoothing ratio in [0, 1) applied to 1-hot targets.
             reduction: 'mean', 'sum', or 'none' loss reduction.
         """
         super().__init__()
         self.gamma = gamma
         self.alpha = alpha
+        self.label_smoothing = label_smoothing
         self.reduction = reduction
 
     def forward(self, inputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
-        """Compute focal loss between raw logits and target class indices.
+        """Compute focal loss between raw logits and target class indices or soft targets.
 
         Args:
             inputs: Logits tensor of shape (batch_size, num_classes).
-            targets: Integer target tensor of shape (batch_size,).
+            targets: Integer target tensor of shape (batch_size,) or soft targets of shape (batch_size, num_classes).
 
         Returns:
             Computed scalar loss tensor (if reduction='mean').
         """
-        # Calculate standard cross entropy probabilities p_t
         log_probs = F.log_softmax(inputs, dim=-1)
         probs = torch.exp(log_probs)
+        num_classes = inputs.shape[-1]
 
-        # Gather log_p_t and p_t corresponding to true class targets
-        targets_one_hot = F.one_hot(targets, num_classes=inputs.shape[-1]).to(inputs.dtype)
-        log_p_t = (log_probs * targets_one_hot).sum(dim=-1)
-        p_t = (probs * targets_one_hot).sum(dim=-1)
+        if targets.dim() == 1:
+            targets_one_hot = F.one_hot(targets, num_classes=num_classes).to(inputs.dtype)
+            if self.label_smoothing > 0.0:
+                smooth_val = self.label_smoothing / num_classes
+                targets_one_hot = targets_one_hot * (1.0 - self.label_smoothing) + smooth_val
+        else:
+            targets_one_hot = targets.to(inputs.dtype)
 
-        # Calculate focal factor (1 - p_t)^gamma
-        focal_weight = (1.0 - p_t) ** self.gamma
-        loss = -focal_weight * log_p_t
+        # Calculate focal factor (1 - p_c)^gamma for each class
+        focal_weight = (1.0 - probs) ** self.gamma
+        loss_per_class = -focal_weight * log_probs * targets_one_hot
 
         # Apply class weights alpha if provided
         if self.alpha is not None:
-            self.alpha = self.alpha.to(inputs.device)
-            alpha_weight = (self.alpha * targets_one_hot).sum(dim=-1)
-            loss = alpha_weight * loss
+            alpha_tensor = self.alpha.to(inputs.device)
+            loss_per_class = loss_per_class * alpha_tensor.unsqueeze(0)
+
+        loss = loss_per_class.sum(dim=-1)
 
         if self.reduction == "mean":
             return loss.mean()
