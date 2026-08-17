@@ -128,6 +128,7 @@ class Trainer:
 
         self.output_dir = output_dir or (settings.output_dir / "checkpoints")
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.best_checkpoint_path = self.output_dir / "best_model.pt"
 
         self.model.to(self.device)
         logger.info("Trainer initialized on device: %s", self.device)

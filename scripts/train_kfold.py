@@ -115,10 +115,11 @@ def train_single_fold(args: argparse.Namespace, fold_idx: int) -> tuple[np.ndarr
     trainer.fit_lpft(lp_epochs=args.lp_epochs, ft_epochs=args.epochs - args.lp_epochs)
 
     # Copy best checkpoint to fold checkpoint name
-    if trainer.best_checkpoint_path and trainer.best_checkpoint_path.exists():
+    best_ckpt = getattr(trainer, "best_checkpoint_path", trainer.output_dir / "best_model.pt")
+    if best_ckpt and best_ckpt.exists():
         import shutil
 
-        shutil.copy(trainer.best_checkpoint_path, fold_ckpt)
+        shutil.copy(best_ckpt, fold_ckpt)
         logger.info("Saved Fold %d best checkpoint to %s", fold_idx, fold_ckpt)
 
     # 5. Extract OOF probabilities on validation set
