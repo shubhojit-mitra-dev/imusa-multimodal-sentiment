@@ -68,4 +68,6 @@ def test_trainer_fit_loop(tmp_path: Path) -> None:
     assert len(results["history"]) == 1
     assert "train_loss" in results["history"][0]
     assert "macro_f1" in results["history"][0]
+    assert hasattr(trainer, "best_checkpoint_path")
+    assert trainer.best_checkpoint_path.exists()
     assert (tmp_path / "checkpoints" / "best_model.pt").exists()
