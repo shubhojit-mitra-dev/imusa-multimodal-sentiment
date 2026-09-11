@@ -61,18 +61,40 @@ class IMUSAPredictor:
         logger.info("Loading model checkpoint from %s...", path)
         checkpoint = torch.load(path, map_location=self.device, weights_only=False)
 
-        model = IMUSAMultimodalClassifier()
-        if isinstance(checkpoint, dict) and "model_state_dict" in checkpoint:
-            model.load_state_dict(checkpoint["model_state_dict"])
+        state_dict = (
+            checkpoint["model_state_dict"]
+            if isinstance(checkpoint, dict) and "model_state_dict" in checkpoint
+            else checkpoint
+        )
+        if not isinstance(state_dict, dict):
+            raise ValueError(f"Invalid checkpoint format loaded from {path}")
+
+        # Auto-detect text model from checkpoint vocab size or settings
+        text_model_name = (
+            "google/muril-base-cased"
+            if settings.model_version == "v2"
+            else settings.text_model_name
+        )
+        for k, v in state_dict.items():
+            if "text_encoder.backbone.embeddings.word_embeddings.weight" in k:
+                if v.shape[0] < 200000:
+                    text_model_name = "google/muril-base-cased"
+                else:
+                    text_model_name = "xlm-roberta-base"
+                break
+
+        model = IMUSAMultimodalClassifier(text_model_name=text_model_name)
+        model.load_state_dict(state_dict)
+
+        if isinstance(checkpoint, dict) and "epoch" in checkpoint:
             logger.info(
-                "Successfully loaded checkpoint (Epoch %d, Macro F1: %.4f)",
+                "Successfully loaded %s checkpoint (Epoch %d, Macro F1: %.4f)",
+                text_model_name,
                 checkpoint.get("epoch", -1),
                 checkpoint.get("macro_f1", 0.0),
             )
-        elif isinstance(checkpoint, dict):
-            model.load_state_dict(checkpoint)
         else:
-            raise ValueError(f"Invalid checkpoint format loaded from {path}")
+            logger.info("Successfully loaded %s model checkpoint state dict.", text_model_name)
 
         return model
 
