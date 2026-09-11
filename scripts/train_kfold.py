@@ -55,6 +55,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--calibrate", action="store_true", help="Run threshold calibration across saved OOF files"
     )
+    parser.add_argument(
+        "--model-version",
+        type=str,
+        default="v2",
+        help="Model version identifier for output directory (default: v2)",
+    )
     return parser.parse_args()
 
 
@@ -68,8 +74,15 @@ def train_single_fold(args: argparse.Namespace, fold_idx: int) -> tuple[np.ndarr
     Returns:
         Tuple of (oof_probs_array, oof_targets_array).
     """
+    settings.model_version = args.model_version
+    settings.versioned_output_dir.mkdir(parents=True, exist_ok=True)
+    settings.checkpoint_dir.mkdir(parents=True, exist_ok=True)
+
     logger.info(
-        "--- Starting Stratified K-Fold Training: Fold %d/%d ---", fold_idx + 1, args.num_folds
+        "--- Starting Stratified K-Fold Training: Fold %d/%d (Version: %s) ---",
+        fold_idx + 1,
+        args.num_folds,
+        settings.model_version,
     )
 
     # 1. Clean dataset
@@ -134,18 +147,34 @@ def main() -> None:
     """Main execution entrypoint for K-Fold training."""
     args = parse_args()
 
-    # Create output directories
+    # Configure versioned output directories
+    settings.model_version = args.model_version
     settings.versioned_output_dir.mkdir(parents=True, exist_ok=True)
     settings.checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
     if args.calibrate:
-        logger.info("--- Performing Post-Hoc Threshold Calibration Across Available Folds ---")
+        logger.info(
+            "--- Performing Post-Hoc Threshold Calibration Across Available Folds (%s) ---",
+            settings.model_version,
+        )
         all_probs = []
         all_targets = []
 
         for k in range(args.num_folds):
             p_file = settings.versioned_output_dir / f"oof_probs_fold_{k}.npy"
             t_file = settings.versioned_output_dir / f"oof_targets_fold_{k}.npy"
+
+            # Auto-fallback: check if OOF files exist in outputs/v1
+            if not p_file.exists() or not t_file.exists():
+                v1_p = settings.output_dir / "v1" / f"oof_probs_fold_{k}.npy"
+                v1_t = settings.output_dir / "v1" / f"oof_targets_fold_{k}.npy"
+                if v1_p.exists() and v1_t.exists():
+                    import shutil
+
+                    shutil.copy(v1_p, p_file)
+                    shutil.copy(v1_t, t_file)
+                    logger.info("Imported missing OOF files for Fold %d from outputs/v1", k)
+
             if p_file.exists() and t_file.exists():
                 all_probs.append(np.load(p_file))
                 all_targets.append(np.load(t_file))
