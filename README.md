@@ -1,59 +1,82 @@
-# Indic Meme Understanding & Sentiment Analysis (IMUSA)
+# IMUSA: Indic Meme Understanding & Sentiment Analysis
 
-> Multimodal AI System for Punjabi Meme Sentiment Analysis.
+> **Official Repository for the FIRE 2026 Shared Task on Multimodal Punjabi Meme Sentiment Classification**
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1i3uWNATbQFnO9fIJS-JiX-1qcjWIdxOr)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1d6ttoeYVnHMZ48-XVz6C-tagsXT47qUf?usp=sharing)
 [![Code Quality](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Type Checked](https://img.shields.io/badge/mypy-strict-blue.svg)](https://mypy-lang.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ---
 
-## Project Overview
+## 📌 Abstract
 
-**IMUSA** is a multimodal AI system designed to analyze and classify Punjabi memes (visual images + embedded Gurmukhi script text) into 4 distinct sentiment categories:
+**IMUSA** (Indic Meme Understanding & Sentiment Analysis) addresses the FIRE 2026 challenge of classifying highly imbalanced, multimodal Punjabi internet memes into four sentiment categories: **Sarcasm**, **Neutral**, **Offensive**, and **Motivational**. 
 
-1. 😏 **Sarcasm** — Irony, satire, or humor where visual context modifies textual meaning.
-2. 😐 **Neutral** — Objective observations or everyday statements without strong emotional polarity.
-3. ⚠️ **Offensive** — Harmful, toxic, or abusive content targeting individuals or groups.
-4. 💪 **Motivational** — Inspiring messages, quotes, or positive life advice.
+This repository implements our **V2 Architecture**, a dual-stream multimodal pipeline that leverages state-of-the-art vision and language models fused via a Gated Multimodal Unit (GMU), trained with a Label-Smoothed $\alpha$-Balanced Focal Loss to mitigate severe class imbalance. We achieve robust generalization through Stratified 5-Fold Cross-Validation, Two-Stage Linear Probing + Fine-Tuning (LP-FT), and post-hoc threshold calibration via Nelder-Mead optimization.
 
-The project is architected as an **end-to-end production ML ecosystem**, combining:
-- **Multimodal Deep Learning**: Vision Transformer (ViT) / CLIP + Multilingual Transformer (XLM-RoBERTa / MuRIL) with cross-attention fusion.
-- **Distributed Training**: PyTorch Distributed Data Parallel (DDP) orchestrated via Kubeflow on Kubernetes.
-- **MLOps & Governance**: Experiment tracking and model registry via MLflow.
-- **High-Performance Serving**: Asynchronous FastAPI inference backend with Redis queueing.
-- **Web Dashboard**: Interactive Next.js frontend with visual sentiment breakdown.
+For a rigorous theoretical deep dive into our methodology, see the complete [Academic Research Paper (`docs/paper.md`)](./docs/paper.md).
 
 ---
 
-## Monorepo Architecture
+## 🚀 Key Architectural Innovations
 
-```
-multimodal-ai-project/
-├── apps/                 # Product Entrypoints
-│   ├── api/              # FastAPI Inference Service (Async prediction engine)
-│   └── frontend/         # Next.js Web Dashboard
-├── libs/                 # Reusable Core Infrastructure
-│   └── imusa/            # Core ML Package (Dataset, Models, Training, Inference)
-├── infra/                # Infrastructure as Code
-│   ├── docker/           # Production Dockerfiles (Training & Serving)
-│   └── k8s/              # Kubernetes Job & Deployment Manifests
-├── scripts/              # Command Line Interface Scripts
-│   ├── clean_data.py     # Raw dataset parser and cleaner
-│   └── explore_data.py   # Statistical explorer & report generator
-├── data/                 # Raw & Processed Datasets (Gitignored)
-└── outputs/              # Artifacts, Plots & Checkpoints (Gitignored)
-```
+### 1. Dual-Stream Feature Extraction
+- **Vision Backbone**: `google/vit-base-patch16-224` (Vision Transformer).
+- **Text Backbone**: `google/muril-base-cased` (Multilingual Representations for Indian Languages, explicitly robust on Gurmukhi script).
+
+### 2. Gated Multimodal Fusion (GMU)
+Instead of naive concatenation, we employ a **Gated Multimodal Unit**. The gate vector $\mathbf{z}$ modulates the visual representation $\mathbf{h}_v$ and the linguistic representation $\mathbf{h}_t$, allowing the model to dynamically prioritize the most informative modality for a given meme.
+
+### 3. $\alpha$-Balanced Focal Loss with Label Smoothing
+To counteract the dataset's extreme class imbalance, we optimize a modified Focal Loss ($\gamma = 2.0$) combined with class-specific $\alpha$-weights and label smoothing ($\epsilon = 0.1$). This prevents the dominant 'Sarcasm' class from overwhelming the gradients.
+
+### 4. Post-Hoc Threshold Calibration (Nelder-Mead)
+We utilize derivative-free **Nelder-Mead optimization** on out-of-fold (OOF) validation logits to discover an optimal decision threshold vector $\boldsymbol{\tau}^*$. This threshold scaling directly maximizes the discrete Macro F1 score, providing a significant performance boost over standard argmax inference.
 
 ---
 
-## Quickstart Guide
+## 📊 V2 Empirical Results
 
-### Prerequisites
+Our ensemble model was evaluated via rigorous Stratified 5-Fold Cross-Validation on the provided Punjabi meme dataset. 
+
+| Metric | Cross-Validation Score |
+| :--- | :--- |
+| **Mean Accuracy** | $60.53\% \pm 1.79\%$ |
+| **Uncalibrated Macro F1** | $0.4548$ |
+| **Calibrated Macro F1** | $\mathbf{0.4630}$ |
+
+*Post-hoc Nelder-Mead calibration yielded an absolute Macro F1 improvement of **+0.83%**.*
+
+### Optimal Decision Thresholds ($\boldsymbol{\tau}^*$)
+The Nelder-Mead optimization discovered the following class-specific logit scaling thresholds:
+- `[1.0319889, 0.8517324, 1.0506044, 1.1507181]`
+
+### Test Set Prediction Distribution (N=500)
+| Sarcasm | Neutral | Motivational | Offensive |
+| :---: | :---: | :---: | :---: |
+| 374 | 87 | 37 | 2 |
+
+---
+
+## 💻 Reproducibility & Code Run-books
+
+Due to the heavy compute requirements of ViT + MuRIL fine-tuning, the official training pipeline is executed via Google Colab Pro instances.
+
+### Training Colab Notebooks
+We provide three reproducible notebooks that document the full 5-Fold Stratified CV process, training, OOF generation, and final ensemble inference:
+
+1. **[Folds 0 & 1 Training Pipeline](https://colab.research.google.com/drive/12Y7JOXljUUjnqbpdD2dLOkmB91gjSCc_?usp=sharing)**
+2. **[Folds 2 & 3 Training Pipeline](https://colab.research.google.com/drive/1C1YY5cxF_s1G60ddmG5OdyzUjpR-o2YI?usp=sharing)**
+3. **[Fold 4, Nelder-Mead Calibration, & Ensemble Inference](https://colab.research.google.com/drive/1d6ttoeYVnHMZ48-XVz6C-tagsXT47qUf?usp=sharing)**
+
+### Local Workspace Setup (For Development)
+
+If you wish to run the data pipelines, tests, or develop locally:
+
+**Prerequisites:**
 - Python 3.12+
 - `uv` package manager (`curl -LsSf https://astral.sh/uv/install.sh | sh`)
-
-### Environment Setup
 
 ```bash
 # Clone the repository
@@ -69,41 +92,52 @@ make setup-hooks
 
 ---
 
-## Data Pipeline
+## 🛠 Monorepo Architecture
 
-### 1. Data Cleaning
-The raw CSV dataset contains multiline strings and unparsed character sequences. Run the cleaning pipeline to produce sanitized datasets:
+This repository operates as a production-grade ML ecosystem.
 
-```bash
-make clean-data
+```text
+multimodal-ai-project/
+├── apps/                 # Application Entrypoints (API, Web)
+├── libs/imusa/           # Core Python Package (PyTorch Models, Datasets, Config)
+│   ├── src/imusa/
+│   │   ├── models/       # ViT, MuRIL, GMU Fusion Definitions
+│   │   ├── training/     # PyTorch DDP Trainers & Loss Functions
+│   │   ├── data/         # Stratified K-Fold & Torch Datasets
+│   │   └── evaluation/   # Nelder-Mead Calibration & Metrics
+│   └── tests/            # Comprehensive Pytest Suite
+├── notebooks/            # Executable Colab Notebooks for V2 Pipeline
+├── docs/                 # Academic Research Paper (paper.md)
+└── scripts/              # CLI Entrypoints (Data Cleaning, EDA)
 ```
-*Output: `data/processed/train_clean.csv`*
 
-### 2. Exploratory Data Analysis (EDA)
-Generate statistical reports, class distribution metrics, image resolution profiling, and sample grids:
-
+### Data Pipeline Commands
 ```bash
+# 1. Clean the raw CSV dataset (Handles multi-line Gurmukhi text)
+make clean-data
+
+# 2. Generate Exploratory Data Analysis (EDA) reports and distributions
 make explore
 ```
-*Output: Visual plots saved to `outputs/exploration/`*
 
----
-
-## Development & Quality Assurance
-
+### Quality Assurance
+The codebase strictly adheres to Staff-Engineer quality standards.
 ```bash
-# Code Linting & Type Checking (Ruff + Mypy)
+# Code Linting & Strict Type Checking (Ruff + Mypy)
 make lint
 
-# Code Formatting (Ruff)
+# Auto-format codebase
 make format
 
-# Run Automated Test Suite
+# Run test suite with coverage
 make test
 ```
 
 ---
 
-## License & Attribution
+## 📜 Citation
 
-Developed for the IMUSA Shared Task FIRE 2026. Built with PyTorch, HuggingFace, FastAPI, and Next.js.
+If you use this codebase or our methodology in your research, please refer to the detailed academic formulation in `docs/paper.md` and cite the repository.
+
+---
+*Developed for the IMUSA Shared Task at FIRE 2026.*
